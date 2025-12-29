@@ -1222,7 +1222,7 @@ func (w *Worker) updateTaskProgressWithPhase(ctx context.Context, taskId string,
 		"progress":     progress,
 		"message":      message,
 		"currentPhase": currentPhase,
-		"updateTime":   time.Now().Format("2006-01-02 15:04:05"),
+		"updateTime":   time.Now().Local().Format("2006-01-02 15:04:05"),
 	}
 	subJsonData, _ := json.Marshal(subData)
 	w.redisClient.Set(ctx, subKey, subJsonData, 30*time.Minute)
@@ -1231,7 +1231,7 @@ func (w *Worker) updateTaskProgressWithPhase(ctx context.Context, taskId string,
 	mainKey := fmt.Sprintf("cscan:task:progress:%s", mainTaskId)
 	mainData := map[string]interface{}{
 		"currentPhase": currentPhase,
-		"updateTime":   time.Now().Format("2006-01-02 15:04:05"),
+		"updateTime":   time.Now().Local().Format("2006-01-02 15:04:05"),
 	}
 	mainJsonData, _ := json.Marshal(mainData)
 	w.redisClient.Set(ctx, mainKey, mainJsonData, 30*time.Minute)
@@ -1275,6 +1275,7 @@ func (w *Worker) saveAssetResult(ctx context.Context, workspaceId, mainTaskId, o
 				HttpHeader: asset.HttpHeader,
 				HttpBody:   asset.HttpBody,
 				IconHash:   asset.IconHash,
+				IconData:   asset.IconData,
 				Screenshot: asset.Screenshot,
 				Server:     asset.Server,
 				Banner:     asset.Banner,
@@ -1665,7 +1666,7 @@ func (w *Worker) reportStatusToRedis() {
 		"cpuOverloadCount":   cpuOverloadCount,
 		"concurrency":        w.config.Concurrency,
 		"runningTasks":       len(w.taskChan),
-		"updateTime":         time.Now().Format("2006-01-02 15:04:05"),
+		"updateTime":         time.Now().Local().Format("2006-01-02 15:04:05"),
 		// 工具安装状态
 		"tools": map[string]bool{
 			"nmap":    scanner.CheckNmapInstalled(),
@@ -2188,7 +2189,7 @@ func (w *Worker) savePocValidationResult(ctx context.Context, taskId, batchId st
 		"batchId":    batchId,
 		"status":     "SUCCESS",
 		"results":    results,
-		"updateTime": time.Now().Format("2006-01-02 15:04:05"),
+		"updateTime": time.Now().Local().Format("2006-01-02 15:04:05"),
 	}
 
 	if errorMsg != "" {
@@ -2221,7 +2222,7 @@ func (w *Worker) savePocValidationResult(ctx context.Context, taskId, batchId st
 			} else {
 				taskInfo["status"] = "SUCCESS"
 			}
-			taskInfo["updateTime"] = time.Now().Format("2006-01-02 15:04:05")
+			taskInfo["updateTime"] = time.Now().Local().Format("2006-01-02 15:04:05")
 			updatedInfo, _ := json.Marshal(taskInfo)
 			w.redisClient.Set(ctx, taskInfoKey, updatedInfo, 24*time.Hour)
 		}

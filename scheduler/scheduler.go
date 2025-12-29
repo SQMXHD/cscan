@@ -90,7 +90,7 @@ func (s *Scheduler) PushTask(ctx context.Context, task *TaskInfo) error {
 	if task.TaskId == "" {
 		task.TaskId = uuid.New().String()
 	}
-	task.CreateTime = time.Now().Format("2006-01-02 15:04:05")
+	task.CreateTime = time.Now().Local().Format("2006-01-02 15:04:05")
 
 	data, err := json.Marshal(task)
 	if err != nil {

@@ -40,6 +40,13 @@ func (l *VulListLogic) VulList(req *types.VulListReq, workspaceId string) (resp 
 	if req.Source != "" {
 		filter["source"] = req.Source
 	}
+	// 支持按host和port筛选（用于资产详情页查询漏洞）
+	if req.Host != "" {
+		filter["host"] = req.Host
+	}
+	if req.Port > 0 {
+		filter["port"] = req.Port
+	}
 
 	// 查询总数
 	total, err := vulModel.Count(l.ctx, filter)
@@ -64,15 +71,15 @@ func (l *VulListLogic) VulList(req *types.VulListReq, workspaceId string) (resp 
 			Source:     v.Source,
 			Severity:   v.Severity,
 			Result:     v.Result,
-			CreateTime: v.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime: v.CreateTime.Local().Format("2006-01-02 15:04:05"),
 			ScanCount:  v.ScanCount,
 		}
 		// 新增字段 - 时间追踪 
 		if !v.FirstSeenTime.IsZero() {
-			vul.FirstSeenTime = v.FirstSeenTime.Format("2006-01-02 15:04:05")
+			vul.FirstSeenTime = v.FirstSeenTime.Local().Format("2006-01-02 15:04:05")
 		}
 		if !v.LastSeenTime.IsZero() {
-			vul.LastSeenTime = v.LastSeenTime.Format("2006-01-02 15:04:05")
+			vul.LastSeenTime = v.LastSeenTime.Local().Format("2006-01-02 15:04:05")
 		}
 		list = append(list, vul)
 	}
@@ -215,7 +222,7 @@ func (l *VulDetailLogic) VulDetail(req *types.VulDetailReq, workspaceId string) 
 		Source:     vul.Source,
 		Severity:   vul.Severity,
 		Result:     vul.Result,
-		CreateTime: vul.CreateTime.Format("2006-01-02 15:04:05"),
+		CreateTime: vul.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		// 知识库信息 
 		CvssScore:   vul.CvssScore,
 		CveId:       vul.CveId,
@@ -228,10 +235,10 @@ func (l *VulDetailLogic) VulDetail(req *types.VulDetailReq, workspaceId string) 
 
 	// 时间追踪字段
 	if !vul.FirstSeenTime.IsZero() {
-		detail.FirstSeenTime = vul.FirstSeenTime.Format("2006-01-02 15:04:05")
+		detail.FirstSeenTime = vul.FirstSeenTime.Local().Format("2006-01-02 15:04:05")
 	}
 	if !vul.LastSeenTime.IsZero() {
-		detail.LastSeenTime = vul.LastSeenTime.Format("2006-01-02 15:04:05")
+		detail.LastSeenTime = vul.LastSeenTime.Local().Format("2006-01-02 15:04:05")
 	}
 
 	// 证据链 

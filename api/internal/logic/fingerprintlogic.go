@@ -108,8 +108,8 @@ func (l *FingerprintListLogic) FingerprintList(req *types.FingerprintListReq) (*
 			CPE:         doc.CPE,
 			IsBuiltin:   doc.IsBuiltin,
 			Enabled:     doc.Enabled,
-			CreateTime:  doc.CreateTime.Format("2006-01-02 15:04:05"),
-			UpdateTime:  doc.UpdateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
+			UpdateTime:  doc.UpdateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -1745,7 +1745,7 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 		return &types.FingerprintMatchAssetsResp{Code: 500, Msg: "获取资产列表失败: " + err.Error()}, nil
 	}
 
-	l.Logger.Infof("FingerprintMatchAssets: fingerprintId=%s, name=%s, totalAssets=%d", req.FingerprintId, fp.Name, len(assets))
+	l.Logger.Infof("FingerprintMatchAssets: fingerprintId=%s, name=%s, totalAssets=%d, updateAsset=%v", req.FingerprintId, fp.Name, len(assets), req.UpdateAsset)
 
 	// 创建指纹引擎
 	engine := NewSingleFingerprintEngine(fp)
@@ -1757,6 +1757,7 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 	}
 
 	var matchedList []types.FingerprintMatchedAsset
+	var updatedCount int
 	for _, asset := range assets {
 		// 构建指纹数据
 		data := &FingerprintData{
@@ -1784,6 +1785,26 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 				Service:   asset.Service,
 			})
 
+			// 如果需要更新资产，将指纹添加到资产的app字段
+			if req.UpdateAsset {
+				// 检查指纹是否已存在
+				fpExists := false
+				for _, app := range asset.App {
+					if app == fp.Name {
+						fpExists = true
+						break
+					}
+				}
+				// 如果不存在，添加指纹
+				if !fpExists {
+					newApps := append(asset.App, fp.Name)
+					err := assetModel.Update(l.ctx, asset.Id.Hex(), bson.M{"app": newApps})
+					if err == nil {
+						updatedCount++
+					}
+				}
+			}
+
 			// 达到限制数量后停止
 			if len(matchedList) >= limit {
 				break
@@ -1792,13 +1813,19 @@ func (l *FingerprintMatchAssetsLogic) FingerprintMatchAssets(req *types.Fingerpr
 	}
 
 	duration := time.Since(startTime)
-	l.Logger.Infof("FingerprintMatchAssets: matched=%d, scanned=%d, duration=%s", len(matchedList), len(assets), duration)
+	l.Logger.Infof("FingerprintMatchAssets: matched=%d, updated=%d, scanned=%d, duration=%s", len(matchedList), updatedCount, len(assets), duration)
+
+	msg := "匹配完成"
+	if req.UpdateAsset && updatedCount > 0 {
+		msg = fmt.Sprintf("匹配完成，已更新 %d 个资产的指纹信息", updatedCount)
+	}
 
 	return &types.FingerprintMatchAssetsResp{
 		Code:         0,
-		Msg:          "匹配完成",
+		Msg:          msg,
 		MatchedCount: len(matchedList),
 		TotalScanned: len(assets),
+		UpdatedCount: updatedCount,
 		Duration:     fmt.Sprintf("%.2fs", duration.Seconds()),
 		MatchedList:  matchedList,
 	}, nil
@@ -1849,7 +1876,7 @@ func (l *HttpServiceMappingListLogic) HttpServiceMappingList(req *types.HttpServ
 			IsHttp:      doc.IsHttp,
 			Description: doc.Description,
 			Enabled:     doc.Enabled,
-			CreateTime:  doc.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

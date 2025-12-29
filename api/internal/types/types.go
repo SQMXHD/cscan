@@ -141,6 +141,7 @@ type Asset struct {
 	HttpBody   string   `json:"httpBody"`
 	Banner     string   `json:"banner"`
 	IconHash   string   `json:"iconHash"`
+	IconData   string   `json:"iconData,omitempty"` // favicon 图片 base64
 	Screenshot string   `json:"screenshot"`
 	Location   string   `json:"location"`
 	IsCDN      bool     `json:"isCdn"`
@@ -167,6 +168,7 @@ type AssetListReq struct {
 	Title        string `json:"title,optional"`
 	App          string `json:"app,optional"`
 	HttpStatus   string `json:"httpStatus,optional"`
+	IconHash     string `json:"iconHash,optional"`
 	OrgId        string `json:"orgId,optional"`
 	OnlyNew      bool   `json:"onlyNew,optional"`
 	OnlyUpdated  bool   `json:"onlyUpdated,optional"`
@@ -194,6 +196,7 @@ type AssetStatResp struct {
 	TopService   []StatItem `json:"topService"`
 	TopApp       []StatItem `json:"topApp"`
 	TopTitle     []StatItem `json:"topTitle"`
+	TopIconHash  []IconHashStatItem `json:"topIconHash,omitempty"`
 	// 新增字段 - 风险等级分布
 	RiskDistribution map[string]int `json:"riskDistribution,omitempty"`
 }
@@ -201,6 +204,12 @@ type AssetStatResp struct {
 type StatItem struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+}
+
+type IconHashStatItem struct {
+	IconHash string `json:"iconHash"`
+	IconData string `json:"iconData"` // base64 图片数据
+	Count    int    `json:"count"`
 }
 
 type AssetDeleteReq struct {
@@ -572,6 +581,8 @@ type VulListReq struct {
 	Authority string `json:"authority,optional"`
 	Severity  string `json:"severity,optional"`
 	Source    string `json:"source,optional"`
+	Host      string `json:"host,optional"`
+	Port      int    `json:"port,optional"`
 }
 
 type VulListResp struct {
@@ -1039,8 +1050,9 @@ type FingerprintValidateResp struct {
 
 // FingerprintMatchAssetsReq 验证指纹匹配现有资产请求
 type FingerprintMatchAssetsReq struct {
-	FingerprintId string `json:"fingerprintId"` // 指纹ID
-	Limit         int    `json:"limit,optional"` // 最大匹配数量，默认100
+	FingerprintId string `json:"fingerprintId"`       // 指纹ID
+	Limit         int    `json:"limit,optional"`      // 最大匹配数量，默认100
+	UpdateAsset   bool   `json:"updateAsset,optional"` // 是否更新匹配到的资产的指纹信息
 }
 
 // FingerprintMatchAssetsResp 验证指纹匹配现有资产响应
@@ -1049,6 +1061,7 @@ type FingerprintMatchAssetsResp struct {
 	Msg          string                    `json:"msg"`
 	MatchedCount int                       `json:"matchedCount"` // 匹配数量
 	TotalScanned int                       `json:"totalScanned"` // 扫描资产总数
+	UpdatedCount int                       `json:"updatedCount"` // 更新的资产数量
 	Duration     string                    `json:"duration"`     // 耗时
 	MatchedList  []FingerprintMatchedAsset `json:"matchedList"`  // 匹配的资产列表
 }

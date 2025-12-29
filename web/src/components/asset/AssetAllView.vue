@@ -59,6 +59,20 @@
                 <span class="stat-name">{{ item.name }}</span>
               </div>
             </div>
+            <div class="stat-column">
+              <div class="stat-title">IconHash</div>
+              <div v-for="item in stat.topIconHash" :key="'icon-'+item.iconHash" class="stat-item stat-item-icon" @click="quickFilter('iconHash', item.iconHash)">
+                <span class="stat-count">{{ item.count }}</span>
+                <img 
+                  v-if="item.iconData && getIconDataUrl(item.iconData)" 
+                  :src="getIconDataUrl(item.iconData)" 
+                  class="stat-icon-img" 
+                  :title="item.iconHash"
+                  @error="handleIconError($event)"
+                />
+                <span v-else class="stat-name" :title="item.iconHash">{{ truncateText(item.iconHash, 10) }}</span>
+              </div>
+            </div>
             <div class="stat-column filter-column">
               <el-checkbox v-model="searchForm.onlyUpdated">只看有更新</el-checkbox>
             </div>
@@ -107,15 +121,56 @@
             <span v-if="row.service" class="service-text">{{ row.service }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="标题" min-width="200" show-overflow-tooltip>
+        <el-table-column label="标题" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.title || '-' }}</template>
         </el-table-column>
-        <el-table-column label="指纹" min-width="150">
+        <el-table-column label="详细信息" min-width="400">
           <template #default="{ row }">
-            <el-tag v-for="app in (row.app || []).slice(0, 3)" :key="app" size="small" type="success" style="margin: 2px">
-              {{ getAppName(app) }}
-            </el-tag>
-            <span v-if="(row.app || []).length > 3" class="more-apps">+{{ (row.app || []).length - 3 }}</span>
+            <el-tabs v-model="row._activeTab" size="small" class="inline-tabs" v-if="hasAnyTabContent(row)">
+              <el-tab-pane label="指纹" name="app" v-if="row.app && row.app.length > 0">
+                <div class="tab-content tab-content-app">
+                  <el-tag v-for="app in (row.app || [])" :key="app" size="small" type="success" style="margin: 2px">
+                    {{ getAppName(app) }}
+                  </el-tag>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="Header" name="header" v-if="row.httpHeader">
+                <div class="tab-content tab-content-header">
+                  <pre class="inline-pre">{{ row.httpHeader }}</pre>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="Body" name="body" v-if="row.httpBody">
+                <div class="tab-content tab-content-body">
+                  <pre class="inline-pre">{{ row.httpBody }}</pre>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="IconHash" name="iconhash" v-if="row.iconHash">
+                <div class="tab-content tab-content-iconhash">
+                  <div class="iconhash-display">
+                    <img 
+                      v-if="row.iconData && getIconDataUrl(row.iconData)" 
+                      :src="getIconDataUrl(row.iconData)" 
+                      class="iconhash-img" 
+                      :title="row.iconHash"
+                      @error="handleIconError($event)"
+                    />
+                    <el-tag type="info" size="small">{{ row.iconHash }}</el-tag>
+                  </div>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane name="vul" v-if="rowVulMap[row.id] && rowVulMap[row.id].length > 0">
+                <template #label>
+                  <span>Vuln</span>
+                  <el-badge :value="getRowVulCount(row)" type="danger" :max="99" style="margin-left: 2px" />
+                </template>
+                <div class="tab-content tab-content-vul">
+                  <el-tag v-for="vul in rowVulMap[row.id]" :key="vul.id" :type="getSeverityType(vul.severity)" size="small" style="margin: 2px" :title="vul.pocFile">
+                    {{ vul.pocFile }}
+                  </el-tag>
+                </div>
+              </el-tab-pane>
+            </el-tabs>
+            <span v-else class="no-data">-</span>
           </template>
         </el-table-column>
         <el-table-column label="截图" width="90" align="center">
@@ -137,6 +192,7 @@
           <template #default="{ row }">
             <div>{{ row.updateTime }}</div>
             <el-tag v-if="row.isNew" type="success" size="small" effect="dark">新</el-tag>
+            <el-tag v-if="row.isUpdated && !row.isNew" type="warning" size="small" effect="dark" style="cursor: pointer" @click="showHistory(row)">更新</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -159,7 +215,7 @@
     </el-card>
 
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="资产详情" width="700px">
+    <el-dialog v-model="detailVisible" title="资产详情" width="900px">
       <el-descriptions :column="2" border v-if="currentAsset">
         <el-descriptions-item label="资产地址" :span="2">
           <a :href="getAssetUrl(currentAsset)" target="_blank" class="asset-link">{{ currentAsset.authority }}</a>
@@ -192,15 +248,141 @@
           />
         </el-descriptions-item>
       </el-descriptions>
+      
+      <!-- 详情Tab页 -->
+      <el-tabs v-model="detailActiveTab" style="margin-top: 15px" v-if="currentAsset">
+        <el-tab-pane label="HTTP Header" name="header">
+          <div class="detail-content-box">
+            <pre v-if="currentAsset.httpHeader" class="detail-pre">{{ currentAsset.httpHeader }}</pre>
+            <el-empty v-else description="暂无Header数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="HTTP Body" name="body">
+          <div class="detail-content-box">
+            <pre v-if="currentAsset.httpBody" class="detail-pre">{{ truncateBody(currentAsset.httpBody) }}</pre>
+            <el-empty v-else description="暂无Body数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="Icon Hash" name="iconhash">
+          <div class="detail-content-box">
+            <div v-if="currentAsset.iconHash" class="iconhash-info">
+              <div class="iconhash-value">
+                <img 
+                  v-if="currentAsset.iconData && getIconDataUrl(currentAsset.iconData)" 
+                  :src="getIconDataUrl(currentAsset.iconData)" 
+                  class="iconhash-detail-img"
+                  @error="handleIconError($event)"
+                />
+                <span class="label">Hash值:</span>
+                <el-tag type="info" size="small">{{ currentAsset.iconHash }}</el-tag>
+                <el-button type="primary" link size="small" @click="copyIconHash">复制</el-button>
+              </div>
+              <div v-if="currentAsset.iconHashFile" class="iconhash-file">
+                <span class="label">文件:</span>
+                <span>{{ currentAsset.iconHashFile }}</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无IconHash数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane name="vul">
+          <template #label>
+            <span>漏洞</span>
+            <el-badge v-if="assetVulList.length > 0" :value="assetVulList.length" type="danger" style="margin-left: 5px" />
+          </template>
+          <div class="detail-content-box">
+            <el-table v-if="assetVulList.length > 0" :data="assetVulList" stripe size="small" max-height="300">
+              <el-table-column prop="pocFile" label="漏洞名称" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="severity" label="级别" width="90">
+                <template #default="{ row }">
+                  <el-tag :type="getSeverityType(row.severity)" size="small">{{ row.severity }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="url" label="URL" min-width="200" show-overflow-tooltip />
+              <el-table-column prop="createTime" label="发现时间" width="160">
+                <template #default="{ row }">{{ formatTime(row.createTime) }}</template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="暂无漏洞数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 历史记录对话框 -->
+    <el-dialog v-model="historyVisible" title="扫描历史记录" width="900px">
+      <div v-if="currentHistoryAsset" style="margin-bottom: 15px">
+        <el-tag type="info">{{ currentHistoryAsset.authority }}</el-tag>
+      </div>
+      <el-table :data="historyList" v-loading="historyLoading" stripe size="small" max-height="500">
+        <el-table-column prop="createTime" label="扫描时间" width="160" />
+        <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="httpStatus" label="状态码" width="80" />
+        <el-table-column label="指纹" min-width="150">
+          <template #default="{ row }">
+            <el-tag v-for="app in (row.app || []).slice(0, 3)" :key="app" size="small" type="success" style="margin: 2px">
+              {{ getAppName(app) }}
+            </el-tag>
+            <span v-if="(row.app || []).length > 3" class="more-apps">+{{ (row.app || []).length - 3 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="showHistoryDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!historyLoading && historyList.length === 0" description="暂无历史记录" />
+      <template #footer>
+        <el-button @click="historyVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 历史详情对话框 -->
+    <el-dialog v-model="historyDetailVisible" title="历史扫描详情" width="800px">
+      <el-descriptions :column="2" border size="small" v-if="currentHistoryDetail">
+        <el-descriptions-item label="扫描时间" :span="2">{{ currentHistoryDetail.createTime }}</el-descriptions-item>
+        <el-descriptions-item label="标题" :span="2">{{ currentHistoryDetail.title || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="状态码">{{ currentHistoryDetail.httpStatus || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="服务">{{ currentHistoryDetail.service || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="指纹" :span="2">
+          <el-tag v-for="app in (currentHistoryDetail.app || [])" :key="app" size="small" type="success" style="margin: 2px">{{ app }}</el-tag>
+          <span v-if="!(currentHistoryDetail.app || []).length">-</span>
+        </el-descriptions-item>
+      </el-descriptions>
+      <el-tabs v-model="historyDetailTab" style="margin-top: 15px" v-if="currentHistoryDetail">
+        <el-tab-pane label="Header" name="header">
+          <div class="detail-content-box">
+            <pre v-if="currentHistoryDetail.httpHeader" class="detail-pre">{{ currentHistoryDetail.httpHeader }}</pre>
+            <el-empty v-else description="暂无Header数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="Body" name="body">
+          <div class="detail-content-box">
+            <pre v-if="currentHistoryDetail.httpBody" class="detail-pre">{{ truncateBody(currentHistoryDetail.httpBody) }}</pre>
+            <el-empty v-else description="暂无Body数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="IconHash" name="iconhash">
+          <div class="detail-content-box">
+            <el-tag v-if="currentHistoryDetail.iconHash" type="info">{{ currentHistoryDetail.iconHash }}</el-tag>
+            <el-empty v-else description="暂无IconHash数据" :image-size="60" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <el-button @click="historyDetailVisible = false">关闭</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getAssetList, getAssetStat, batchDeleteAsset, clearAsset } from '@/api/asset'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -216,18 +398,80 @@ const activeTab = ref('quick')
 const organizations = ref([])
 const detailVisible = ref(false)
 const currentAsset = ref(null)
+const detailActiveTab = ref('header')
+const assetVulList = ref([])
+const fingerprintList = ref([])
+const rowVulMap = ref({}) // 存储每行资产的漏洞数据
 
-const stat = reactive({ topPorts: [], topService: [], topApp: [] })
-const searchForm = reactive({ host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false })
+// 历史记录相关
+const historyVisible = ref(false)
+const historyLoading = ref(false)
+const historyList = ref([])
+const currentHistoryAsset = ref(null)
+const historyDetailVisible = ref(false)
+const currentHistoryDetail = ref(null)
+const historyDetailTab = ref('header')
+
+const stat = reactive({ topPorts: [], topService: [], topApp: [], topIconHash: [] })
+const searchForm = reactive({ host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '' })
 const pagination = reactive({ page: 1, pageSize: 50, total: 0 })
 
 function handleWorkspaceChanged() { pagination.page = 1; loadData(); loadStat() }
 
 onMounted(() => {
-  loadData(); loadStat(); loadOrganizations()
+  loadData(); loadStat(); loadOrganizations(); loadFingerprints()
   window.addEventListener('workspace-changed', handleWorkspaceChanged)
 })
 onUnmounted(() => { window.removeEventListener('workspace-changed', handleWorkspaceChanged) })
+
+// 监听tableData变化，为每行添加默认Tab和加载漏洞数据
+watch(tableData, (newData) => {
+  if (newData && newData.length > 0) {
+    newData.forEach(row => {
+      // 设置默认显示的Tab（优先显示有内容的Tab）
+      if (!row._activeTab) {
+        row._activeTab = getDefaultTab(row)
+      }
+    })
+    loadAllRowVuls(newData)
+  }
+}, { immediate: true })
+
+// 判断行是否有任何Tab内容
+function hasAnyTabContent(row) {
+  return (row.app && row.app.length > 0) || 
+         row.httpHeader || 
+         row.httpBody || 
+         row.iconHash || 
+         (rowVulMap.value[row.id] && rowVulMap.value[row.id].length > 0)
+}
+
+// 获取默认显示的Tab
+function getDefaultTab(row) {
+  if (row.app && row.app.length > 0) return 'app'
+  if (row.httpHeader) return 'header'
+  if (row.httpBody) return 'body'
+  if (row.iconHash) return 'iconhash'
+  return 'app'
+}
+
+// 批量加载所有行的漏洞数据
+async function loadAllRowVuls(rows) {
+  rowVulMap.value = {}
+  for (const row of rows) {
+    try {
+      const res = await request.post('/vul/list', { host: row.host, port: row.port, page: 1, pageSize: 10 })
+      if (res.code === 0 && res.list && res.list.length > 0) {
+        rowVulMap.value[row.id] = res.list
+      }
+    } catch (e) { /* ignore */ }
+  }
+}
+
+// 获取行的漏洞数量
+function getRowVulCount(row) {
+  return rowVulMap.value[row.id]?.length || 0
+}
 
 async function loadData() {
   loading.value = true
@@ -236,7 +480,7 @@ async function loadData() {
       page: pagination.page, pageSize: pagination.pageSize,
       host: searchForm.host, port: searchForm.port, service: searchForm.service,
       title: searchForm.title, app: searchForm.app, orgId: searchForm.orgId,
-      onlyUpdated: searchForm.onlyUpdated
+      onlyUpdated: searchForm.onlyUpdated, iconHash: searchForm.iconHash
     })
     if (res.code === 0) { tableData.value = res.list || []; pagination.total = res.total }
   } finally { loading.value = false }
@@ -248,6 +492,7 @@ async function loadStat() {
     stat.topPorts = res.topPorts || []
     stat.topService = res.topService || []
     stat.topApp = res.topApp || []
+    stat.topIconHash = res.topIconHash || []
   }
 }
 
@@ -258,15 +503,35 @@ async function loadOrganizations() {
   } catch (e) { console.error(e) }
 }
 
+async function loadFingerprints() {
+  try {
+    const res = await request.post('/fingerprint/list', { page: 1, pageSize: 500, enabled: true })
+    if (res.code === 0) fingerprintList.value = res.list || []
+  } catch (e) { console.error(e) }
+}
+
 function quickFilter(field, value) {
-  searchForm[field] = field === 'port' ? parseInt(value, 10) : value
+  if (field === 'app') {
+    // App筛选：去掉 [xxx] 后缀，只用纯指纹名称查询
+    searchForm.app = cleanAppName(value)
+  } else if (field === 'iconHash') {
+    searchForm.iconHash = value
+  } else {
+    searchForm[field] = field === 'port' ? parseInt(value, 10) : value
+  }
   activeTab.value = 'quick'
   handleSearch()
 }
 
+// 清理指纹名称，去掉 [custom(xxx)] 等后缀
+function cleanAppName(app) {
+  if (!app) return ''
+  return app.replace(/\s*\[.*\]\s*$/, '').trim()
+}
+
 function handleSearch() { pagination.page = 1; loadData() }
 function handleReset() {
-  Object.assign(searchForm, { host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false })
+  Object.assign(searchForm, { host: '', port: null, service: '', title: '', app: '', orgId: '', onlyUpdated: false, iconHash: '' })
   handleSearch(); loadStat()
 }
 
@@ -286,9 +551,47 @@ async function handleDelete(row) {
   if (res.code === 0) { ElMessage.success('删除成功'); loadData(); loadStat(); emit('data-changed') }
 }
 
-function showDetail(row) {
+async function showDetail(row) {
   currentAsset.value = row
+  detailActiveTab.value = 'header'
+  assetVulList.value = []
   detailVisible.value = true
+  // 加载该资产的漏洞列表
+  loadAssetVulList(row.host, row.port)
+}
+
+async function loadAssetVulList(host, port) {
+  try {
+    const res = await request.post('/vul/list', { host, port, page: 1, pageSize: 100 })
+    if (res.code === 0) {
+      assetVulList.value = res.list || []
+    }
+  } catch (e) { console.error(e) }
+}
+
+// 显示历史记录
+async function showHistory(row) {
+  currentHistoryAsset.value = row
+  historyList.value = []
+  historyVisible.value = true
+  historyLoading.value = true
+  try {
+    const res = await request.post('/asset/history', { assetId: row.id, limit: 20 })
+    if (res.code === 0) {
+      historyList.value = res.list || []
+    }
+  } catch (e) { 
+    console.error(e) 
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+// 显示历史详情
+function showHistoryDetail(row) {
+  currentHistoryDetail.value = row
+  historyDetailTab.value = 'header'
+  historyDetailVisible.value = true
 }
 
 async function handleClear() {
@@ -315,6 +618,120 @@ function getScreenshotUrl(screenshot) {
     return screenshot.startsWith('data:') ? screenshot : `data:image/png;base64,${screenshot}`
   }
   return `/api/screenshot/${screenshot}`
+}
+
+function truncateBody(body) {
+  if (!body) return ''
+  const maxLen = 5000
+  if (body.length > maxLen) {
+    return body.substring(0, maxLen) + '\n\n... [内容过长，已截断]'
+  }
+  return body
+}
+
+function truncateText(text, maxLen = 100) {
+  if (!text) return ''
+  if (text.length > maxLen) {
+    return text.substring(0, maxLen) + '...'
+  }
+  return text
+}
+
+function getIconDataUrl(iconData) {
+  if (!iconData || iconData.length === 0) return ''
+  
+  // 如果已经是 data URL，直接返回
+  if (typeof iconData === 'string' && iconData.startsWith('data:')) return iconData
+  
+  // 确保是字符串类型
+  const base64Str = typeof iconData === 'string' ? iconData : ''
+  if (!base64Str) return ''
+  
+  // 根据 base64 解码后的魔数判断图片类型
+  try {
+    const binaryStr = atob(base64Str)
+    if (binaryStr.length < 4) return ''
+    
+    // 跳过开头的空白字符
+    let start = 0
+    while (start < binaryStr.length && (binaryStr[start] === ' ' || binaryStr[start] === '\t' || binaryStr[start] === '\n' || binaryStr[start] === '\r')) {
+      start++
+    }
+    
+    // 检测是否为 HTML/XML 内容（无效的图片数据）
+    if (binaryStr[start] === '<') {
+      const header = binaryStr.substring(start, start + 100).toLowerCase()
+      if (header.startsWith('<!doctype') || header.startsWith('<html') || header.startsWith('<?xml')) {
+        return '' // HTML/XML 内容，不是有效图片
+      }
+      // SVG 是有效的图片格式
+      if (header.startsWith('<svg')) {
+        return `data:image/svg+xml;base64,${base64Str}`
+      }
+      return '' // 其他 XML/HTML 内容
+    }
+    
+    const bytes = new Uint8Array(binaryStr.length)
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i)
+    }
+    
+    // 检测图片格式魔数
+    // PNG: 89 50 4E 47
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+      return `data:image/png;base64,${base64Str}`
+    }
+    // JPEG: FF D8 FF
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+      return `data:image/jpeg;base64,${base64Str}`
+    }
+    // GIF: 47 49 46 38 (GIF8)
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) {
+      return `data:image/gif;base64,${base64Str}`
+    }
+    // ICO: 00 00 01 00 或 00 00 02 00 (CUR)
+    if (bytes[0] === 0x00 && bytes[1] === 0x00 && (bytes[2] === 0x01 || bytes[2] === 0x02) && bytes[3] === 0x00) {
+      return `data:image/x-icon;base64,${base64Str}`
+    }
+    // BMP: 42 4D (BM)
+    if (bytes[0] === 0x42 && bytes[1] === 0x4D) {
+      return `data:image/bmp;base64,${base64Str}`
+    }
+    // WEBP: RIFF...WEBP
+    if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+        bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+      return `data:image/webp;base64,${base64Str}`
+    }
+    
+    // 未识别的格式，返回空（不显示）
+    return ''
+  } catch (e) {
+    return ''
+  }
+}
+
+function copyIconHash() {
+  if (currentAsset.value && currentAsset.value.iconHash) {
+    navigator.clipboard.writeText(currentAsset.value.iconHash)
+    ElMessage.success('已复制IconHash')
+  }
+}
+
+// 处理图片加载错误
+function handleIconError(event) {
+  // 隐藏加载失败的图片
+  event.target.style.display = 'none'
+}
+
+function getSeverityType(severity) {
+  const map = { critical: 'danger', high: 'danger', medium: 'warning', low: 'info', info: 'success' }
+  return map[severity?.toLowerCase()] || 'info'
+}
+
+function formatTime(time) {
+  if (!time) return '-'
+  if (typeof time === 'string') return time
+  return new Date(time).toLocaleString()
 }
 
 function refresh() { loadData(); loadStat() }
@@ -344,6 +761,9 @@ defineExpose({ refresh })
         .stat-count { min-width: 30px; padding: 1px 6px; margin-right: 8px; background: #409eff; color: #fff; border-radius: 3px; font-size: 12px; }
         .stat-name { color: #409eff; font-size: 13px; }
       }
+      .stat-item-icon {
+        .stat-icon-img { width: 16px; height: 16px; margin-right: 4px; vertical-align: middle; border-radius: 2px; }
+      }
     }
     .filter-column { margin-left: auto; }
   }
@@ -355,9 +775,118 @@ defineExpose({ refresh })
     .org-text, .location-text { color: var(--el-text-color-secondary); font-size: 12px; }
     .port-text { font-weight: 500; margin-right: 8px; }
     .service-text { color: #67c23a; font-size: 12px; }
-    .more-apps { color: var(--el-text-color-secondary); font-size: 12px; }
+    .more-apps { color: var(--el-text-color-secondary); font-size: 12px; margin-left: 4px; }
+    .no-data { color: var(--el-text-color-placeholder); font-size: 12px; }
     .screenshot-img { width: 70px; height: 50px; border-radius: 4px; cursor: pointer; }
     .pagination { margin-top: 15px; justify-content: flex-end; }
+  }
+  
+  // 表格内嵌Tab样式
+  .inline-tabs {
+    :deep(.el-tabs__header) {
+      margin-bottom: 5px;
+    }
+    :deep(.el-tabs__nav-wrap::after) {
+      height: 1px;
+    }
+    :deep(.el-tabs__item) {
+      height: 28px;
+      line-height: 28px;
+      font-size: 12px;
+      padding: 0 10px;
+    }
+    :deep(.el-tabs__content) {
+      padding: 0;
+    }
+    .tab-content {
+      min-height: 30px;
+      max-height: 80px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+    .tab-content-app {
+      // 指纹Tab：最大高度约三行标签（每行约26px）
+      max-height: 78px;
+      overflow: auto;
+    }
+    .tab-content-scroll {
+      max-height: 150px;
+      overflow: auto;
+    }
+    .tab-content-header {
+      // Header Tab：增加高度以显示更多内容
+      max-height: 200px;
+      overflow: auto;
+    }
+    .tab-content-body {
+      // Body Tab：增加高度以显示更多内容
+      max-height: 200px;
+      overflow: auto;
+    }
+    .tab-content-vul {
+      // Vuln Tab：增加高度以显示更多漏洞
+      max-height: 150px;
+      overflow: auto;
+    }
+    .tab-content-iconhash {
+      .iconhash-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        .iconhash-img {
+          width: 24px;
+          height: 24px;
+          border-radius: 4px;
+          border: 1px solid var(--el-border-color-lighter);
+        }
+      }
+    }
+    .inline-pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      color: var(--el-text-color-regular);
+    }
+  }
+  
+  // 详情Tab页样式
+  .detail-content-box {
+    min-height: 150px;
+    max-height: 350px;
+    overflow: auto;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 4px;
+    padding: 10px;
+    background: var(--el-fill-color-lighter);
+  }
+  .detail-pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .iconhash-info {
+    .iconhash-value {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      .label { color: var(--el-text-color-secondary); }
+    }
+    .iconhash-file {
+      .label { color: var(--el-text-color-secondary); margin-right: 10px; }
+    }
+    .iconhash-detail-img {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      border: 1px solid var(--el-border-color-lighter);
+    }
   }
 }
 </style>

@@ -444,7 +444,8 @@ type AssetDocument struct {
 	Ipv6          []*IPV6                `protobuf:"bytes,19,rep,name=ipv6,proto3" json:"ipv6,omitempty"`
 	Screenshot    string                 `protobuf:"bytes,20,opt,name=screenshot,proto3" json:"screenshot,omitempty"`
 	IsHttp        bool                   `protobuf:"varint,21,opt,name=isHttp,proto3" json:"isHttp,omitempty"`
-	Source        string                 `protobuf:"bytes,22,opt,name=source,proto3" json:"source,omitempty"` // 资产来源: subfinder, portscan, etc.
+	Source        string                 `protobuf:"bytes,22,opt,name=source,proto3" json:"source,omitempty"`     // 资产来源: subfinder, portscan, etc.
+	IconData      []byte                 `protobuf:"bytes,23,opt,name=iconData,proto3" json:"iconData,omitempty"` // favicon 图片原始数据
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -631,6 +632,13 @@ func (x *AssetDocument) GetSource() string {
 		return x.Source
 	}
 	return ""
+}
+
+func (x *AssetDocument) GetIconData() []byte {
+	if x != nil {
+		return x.IconData
+	}
+	return nil
 }
 
 type IPV4 struct {
@@ -3605,7 +3613,7 @@ const file_task_proto_rawDesc = "" +
 	"\vworkspaceId\x18\x05 \x01(\tR\vworkspaceId\"A\n" +
 	"\vNewTaskResp\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xc5\x04\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xe1\x04\n" +
 	"\rAssetDocument\x12\x1c\n" +
 	"\tauthority\x18\x01 \x01(\tR\tauthority\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
@@ -3637,7 +3645,8 @@ const file_task_proto_rawDesc = "" +
 	"screenshot\x18\x14 \x01(\tR\n" +
 	"screenshot\x12\x16\n" +
 	"\x06isHttp\x18\x15 \x01(\bR\x06isHttp\x12\x16\n" +
-	"\x06source\x18\x16 \x01(\tR\x06source\"H\n" +
+	"\x06source\x18\x16 \x01(\tR\x06source\x12\x1a\n" +
+	"\biconData\x18\x17 \x01(\fR\biconData\"H\n" +
 	"\x04IPV4\x12\x0e\n" +
 	"\x02ip\x18\x01 \x01(\tR\x02ip\x12\x14\n" +
 	"\x05ipInt\x18\x02 \x01(\rR\x05ipInt\x12\x1a\n" +

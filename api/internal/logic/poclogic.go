@@ -44,7 +44,7 @@ func (l *TagMappingListLogic) TagMappingList() (resp *types.TagMappingListResp, 
 			NucleiTags:  doc.NucleiTags,
 			Description: doc.Description,
 			Enabled:     doc.Enabled,
-			CreateTime:  doc.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -168,7 +168,7 @@ func (l *CustomPocListLogic) CustomPocList(req *types.CustomPocListReq) (resp *t
 			Description: doc.Description,
 			Content:     doc.Content,
 			Enabled:     doc.Enabled,
-			CreateTime:  doc.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

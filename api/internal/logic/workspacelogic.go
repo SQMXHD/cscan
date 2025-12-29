@@ -45,7 +45,7 @@ func (l *WorkspaceListLogic) WorkspaceList(req *types.PageReq) (resp *types.Work
 			Name:        w.Name,
 			Description: w.Description,
 			Status:      w.Status,
-			CreateTime:  w.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  w.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

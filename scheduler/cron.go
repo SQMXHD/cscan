@@ -73,7 +73,7 @@ func (m *CronManager) AddTask(ctx context.Context, task *CronTask) error {
 		return fmt.Errorf("invalid cron spec: %v", err)
 	}
 
-	task.NextRunTime = schedule.Next(time.Now()).Format("2006-01-02 15:04:05")
+	task.NextRunTime = schedule.Next(time.Now()).Local().Format("2006-01-02 15:04:05")
 	task.Status = "enable"
 
 	// 保存到Redis
@@ -178,12 +178,12 @@ func (m *CronManager) executeTask(task *CronTask) {
 	ctx := context.Background()
 
 	// 更新最后执行时间
-	task.LastRunTime = time.Now().Format("2006-01-02 15:04:05")
+	task.LastRunTime = time.Now().Local().Format("2006-01-02 15:04:05")
 
 	// 计算下次执行时间
 	parser := cron.NewParser(cron.Second | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
 	schedule, _ := parser.Parse(task.CronSpec)
-	task.NextRunTime = schedule.Next(time.Now()).Format("2006-01-02 15:04:05")
+	task.NextRunTime = schedule.Next(time.Now()).Local().Format("2006-01-02 15:04:05")
 
 	// 更新Redis
 	data, _ := json.Marshal(task)

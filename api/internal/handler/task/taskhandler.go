@@ -320,9 +320,6 @@ func TaskLogsStreamHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
-		// 发送连接成功消息
-		fmt.Fprintf(w, "data: {\"level\":\"INFO\",\"message\":\"任务日志流连接成功\",\"timestamp\":\"%s\",\"workerName\":\"API\",\"taskId\":\"%s\"}\n\n",
-			time.Now().Format("2006-01-02 15:04:05"), taskId)
 		flusher.Flush()
 
 		// 先发送最近的历史日志

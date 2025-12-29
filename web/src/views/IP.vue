@@ -89,7 +89,7 @@
           <template #default="{ row }">
             <div class="port-list">
               <el-tag 
-                v-for="port in (row.ports || []).slice(0, 10)" 
+                v-for="port in (row.ports)" 
                 :key="port.port" 
                 size="small" 
                 :type="getPortType(port.service)"

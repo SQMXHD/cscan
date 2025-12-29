@@ -66,7 +66,7 @@ func (p *LogPublisher) publish(taskId, level, message string) {
 	if p.client == nil {
 		// Redis连接失败时，至少输出到标准输出，确保日志不丢失
 		fmt.Printf("[%s] [%s] [%s] %s: %s\n", 
-			time.Now().Format("2006-01-02 15:04:05"), 
+			time.Now().Local().Format("2006-01-02 15:04:05"), 
 			level, 
 			p.workerName, 
 			taskId, 
@@ -75,7 +75,7 @@ func (p *LogPublisher) publish(taskId, level, message string) {
 	}
 
 	entry := LogEntry{
-		Timestamp:  time.Now().Format("2006-01-02 15:04:05"),
+		Timestamp:  time.Now().Local().Format("2006-01-02 15:04:05"),
 		Level:      level,
 		WorkerName: p.workerName,
 		TaskId:     taskId,
@@ -136,7 +136,7 @@ func NewWorkerLogger(client *redis.Client, workerName string) *WorkerLogger {
 // 注意：直接写控制台，不通过 logx，避免被 RedisLogWriter 重复拦截
 func (l *WorkerLogger) log(level, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	timestamp := time.Now().Local().Format("2006-01-02 15:04:05")
 	
 	// 直接输出到控制台（不通过 logx，避免重复）
 	fmt.Printf("%s [%s] %s\n", timestamp, level, msg)
@@ -181,7 +181,7 @@ func NewTaskLogger(client *redis.Client, workerName, taskId string) *TaskLogger 
 // 注意：直接写控制台，不通过 logx，避免被 RedisLogWriter 重复拦截
 func (l *TaskLogger) log(level, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	timestamp := time.Now().Local().Format("2006-01-02 15:04:05")
 	
 	// 直接输出到控制台（不通过 logx，避免重复）
 	fmt.Printf("%s [%s] [Task:%s] %s\n", timestamp, level, l.taskId, msg)
@@ -245,16 +245,16 @@ func (w *RedisLogWriter) Write(p []byte) (n int, err error) {
 	}
 
 	var level, message string
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	timestamp := time.Now().Local().Format("2006-01-02 15:04:05")
 
 	// 尝试解析 logx 的 JSON 格式日志
 	var logxLog logxEntry
 	if err := json.Unmarshal([]byte(msg), &logxLog); err == nil && logxLog.Timestamp != "" {
 		// 解析时间
 		if t, err := time.Parse("2006-01-02T15:04:05.000-07:00", logxLog.Timestamp); err == nil {
-			timestamp = t.Format("2006-01-02 15:04:05")
+			timestamp = t.Local().Format("2006-01-02 15:04:05")
 		} else if t, err := time.Parse("2006-01-02T15:04:05.000Z07:00", logxLog.Timestamp); err == nil {
-			timestamp = t.Format("2006-01-02 15:04:05")
+			timestamp = t.Local().Format("2006-01-02 15:04:05")
 		}
 		level = strings.ToUpper(logxLog.Level)
 		if level == "" {

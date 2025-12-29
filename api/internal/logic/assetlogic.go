@@ -2,6 +2,8 @@ package logic
 
 import (
 	"context"
+	"encoding/base64"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +15,13 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+// cleanAppName 清理指纹名称，去掉类似 [custom(xxx)] 的后缀
+func cleanAppName(app string) string {
+	// 匹配 [xxx] 或 [xxx(yyy)] 格式的后缀并去掉
+	re := regexp.MustCompile(`\s*\[.*\]\s*$`)
+	return strings.TrimSpace(re.ReplaceAllString(app, ""))
+}
 
 // sortAssetsByTime 按时间排序资产
 func sortAssetsByTime(assets []model.Asset, byUpdateTime bool) {
@@ -72,6 +81,26 @@ func sortMapToStatItemsInt(m map[int]int, limit int) []types.StatItem {
 	return result
 }
 
+// sortIconHashMap 将 IconHash map 转换为排序后的列表
+func sortIconHashMap(m map[string]*types.IconHashStatItem, limit int) []types.IconHashStatItem {
+	var sorted []*types.IconHashStatItem
+	for _, v := range m {
+		sorted = append(sorted, v)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Count > sorted[j].Count
+	})
+	
+	result := make([]types.IconHashStatItem, 0, limit)
+	for i, item := range sorted {
+		if i >= limit {
+			break
+		}
+		result = append(result, *item)
+	}
+	return result
+}
+
 // parseQuerySyntax 解析查询语法
 // 支持格式: port=80 && service=http || title="test"
 func parseQuerySyntax(query string, filter bson.M) {
@@ -113,7 +142,7 @@ func parseQuerySyntax(query string, filter bson.M) {
 		case "title":
 			filter["title"] = bson.M{"$regex": value, "$options": "i"}
 		case "app", "finger", "fingerprint":
-			filter["app"] = bson.M{"$regex": value, "$options": "i"}
+			filter["app"] = bson.M{"$regex": cleanAppName(value), "$options": "i"}
 		case "status", "httpstatus":
 			filter["status"] = value
 		case "domain":
@@ -160,10 +189,15 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			filter["title"] = bson.M{"$regex": req.Title, "$options": "i"}
 		}
 		if req.App != "" {
-			filter["app"] = bson.M{"$regex": req.App, "$options": "i"}
+			// 清理指纹名称，去掉 [custom(xxx)] 后缀后再查询
+			cleanedApp := cleanAppName(req.App)
+			filter["app"] = bson.M{"$regex": cleanedApp, "$options": "i"}
 		}
 		if req.HttpStatus != "" {
 			filter["status"] = req.HttpStatus
+		}
+		if req.IconHash != "" {
+			filter["icon_hash"] = req.IconHash
 		}
 	}
 
@@ -268,6 +302,12 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			l.Logger.Infof("Asset %s:%d has NO orgId", a.Host, a.Port)
 		}
 
+		// 将 IconHashBytes 转换为 base64
+		iconData := ""
+		if len(a.IconHashBytes) > 0 {
+			iconData = base64.StdEncoding.EncodeToString(a.IconHashBytes)
+		}
+
 		list = append(list, types.Asset{
 			Id:         a.Id.Hex(),
 			Authority:  a.Authority,
@@ -282,14 +322,15 @@ func (l *AssetListLogic) AssetList(req *types.AssetListReq, workspaceId string) 
 			HttpBody:   a.HttpBody,
 			Banner:     a.Banner,
 			IconHash:   a.IconHash,
+			IconData:   iconData,
 			Screenshot: a.Screenshot,
 			Location:   location,
 			IsCDN:      a.IsCDN,
 			IsCloud:    a.IsCloud,
 			IsNew:      a.IsNewAsset,
 			IsUpdated:  a.IsUpdated,
-			CreateTime: a.CreateTime.Format("2006-01-02 15:04:05"),
-			UpdateTime: a.UpdateTime.Format("2006-01-02 15:04:05"),
+			CreateTime: a.CreateTime.Local().Format("2006-01-02 15:04:05"),
+			UpdateTime: a.UpdateTime.Local().Format("2006-01-02 15:04:05"),
 			// 组织信息
 			OrgId:   a.OrgId,
 			OrgName: orgName,
@@ -324,6 +365,7 @@ func NewAssetStatLogic(ctx context.Context, svcCtx *svc.ServiceContext) *AssetSt
 func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatResp, err error) {
 	var totalAsset, totalHost, newCount, updatedCount int64
 	var topPorts, topService, topApp, topTitle []types.StatItem
+	var topIconHash []types.IconHashStatItem
 	var riskDistribution map[string]int
 
 	// 如果 workspaceId 为空，统计所有工作空间
@@ -334,6 +376,7 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 		serviceMap := make(map[string]int)
 		appMap := make(map[string]int)
 		titleMap := make(map[string]int)
+		iconHashMap := make(map[string]*types.IconHashStatItem)
 		riskMap := make(map[string]int)
 		
 		for _, ws := range workspaces {
@@ -361,8 +404,8 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 				serviceMap[s.Field] += s.Count
 			}
 			
-			// 聚合应用
-			appStats, _ := assetModel.Aggregate(l.ctx, "app", 20)
+			// 聚合应用（使用专门的AggregateApp方法展开数组）
+			appStats, _ := assetModel.AggregateApp(l.ctx, 20)
 			for _, s := range appStats {
 				appMap[s.Field] += s.Count
 			}
@@ -372,6 +415,24 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 			for _, s := range titleStats {
 				if s.Field != "" {
 					titleMap[s.Field] += s.Count
+				}
+			}
+			
+			// 聚合 IconHash
+			iconHashStats, _ := assetModel.AggregateIconHash(l.ctx, 20)
+			for _, s := range iconHashStats {
+				if existing, ok := iconHashMap[s.IconHash]; ok {
+					existing.Count += s.Count
+				} else {
+					iconData := ""
+					if len(s.IconData) > 0 {
+						iconData = base64.StdEncoding.EncodeToString(s.IconData)
+					}
+					iconHashMap[s.IconHash] = &types.IconHashStatItem{
+						IconHash: s.IconHash,
+						IconData: iconData,
+						Count:    s.Count,
+					}
 				}
 			}
 			
@@ -387,6 +448,7 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 		topService = sortMapToStatItems(serviceMap, 10)
 		topApp = sortMapToStatItems(appMap, 10)
 		topTitle = sortMapToStatItems(titleMap, 10)
+		topIconHash = sortIconHashMap(iconHashMap, 10)
 		riskDistribution = riskMap
 	} else {
 		assetModel := l.svcCtx.GetAssetModel(workspaceId)
@@ -421,8 +483,8 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 			})
 		}
 
-		// Top应用
-		appStats, _ := assetModel.Aggregate(l.ctx, "app", 10)
+		// Top应用（使用专门的AggregateApp方法展开数组）
+		appStats, _ := assetModel.AggregateApp(l.ctx, 10)
 		topApp = make([]types.StatItem, 0, len(appStats))
 		for _, s := range appStats {
 			topApp = append(topApp, types.StatItem{
@@ -443,6 +505,21 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 			}
 		}
 
+		// Top IconHash
+		iconHashStats, _ := assetModel.AggregateIconHash(l.ctx, 10)
+		topIconHash = make([]types.IconHashStatItem, 0, len(iconHashStats))
+		for _, s := range iconHashStats {
+			iconData := ""
+			if len(s.IconData) > 0 {
+				iconData = base64.StdEncoding.EncodeToString(s.IconData)
+			}
+			topIconHash = append(topIconHash, types.IconHashStatItem{
+				IconHash: s.IconHash,
+				IconData: iconData,
+				Count:    s.Count,
+			})
+		}
+
 		// 风险等级分布 
 		riskDistribution, _ = assetModel.AggregateRiskLevel(l.ctx)
 	}
@@ -458,6 +535,7 @@ func (l *AssetStatLogic) AssetStat(workspaceId string) (resp *types.AssetStatRes
 		TopService:       topService,
 		TopApp:           topApp,
 		TopTitle:         topTitle,
+		TopIconHash:      topIconHash,
 		RiskDistribution: riskDistribution,
 	}, nil
 }
@@ -591,7 +669,7 @@ func (l *AssetHistoryLogic) AssetHistory(req *types.AssetHistoryReq, workspaceId
 			IconHash:   h.IconHash,
 			Screenshot: h.Screenshot,
 			TaskId:     h.TaskId,
-			CreateTime: h.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime: h.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

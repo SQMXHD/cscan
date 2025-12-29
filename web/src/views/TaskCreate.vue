@@ -208,7 +208,7 @@
             <template v-if="form.pocscanEnable">
               <el-form-item label="自动扫描">
                 <el-checkbox v-model="form.pocscanAutoScan" :disabled="form.pocscanCustomOnly">自定义标签映射</el-checkbox>
-                <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly">Wappalyzer自动扫描</el-checkbox>
+                <el-checkbox v-model="form.pocscanAutomaticScan" :disabled="form.pocscanCustomOnly">Web指纹自动匹配</el-checkbox>
               </el-form-item>
               <el-form-item label="自定义POC">
                 <el-checkbox v-model="form.pocscanCustomOnly">只使用自定义POC</el-checkbox>

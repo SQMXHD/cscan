@@ -136,7 +136,7 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 			Server:     a.Server,
 			IconHash:   a.IconHash,
 			Screenshot: a.Screenshot,
-			CreateTime: a.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime: a.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -149,7 +149,7 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 			PocFile:    v.PocFile,
 			Severity:   v.Severity,
 			Result:     v.Result,
-			CreateTime: v.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime: v.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 
@@ -175,7 +175,7 @@ func (l *ReportDetailLogic) ReportDetail(req *types.ReportDetailReq, workspaceId
 			TaskName:    task.Name,
 			Target:      task.Target,
 			Status:      task.Status,
-			CreateTime:  task.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  task.CreateTime.Local().Format("2006-01-02 15:04:05"),
 			AssetCount:  len(assets),
 			VulCount:    len(vuls),
 			Assets:      assetList,
@@ -245,7 +245,7 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 	f.SetCellValue("概览", "A5", "任务状态")
 	f.SetCellValue("概览", "B5", task.Status)
 	f.SetCellValue("概览", "A6", "创建时间")
-	f.SetCellValue("概览", "B6", task.CreateTime.Format("2006-01-02 15:04:05"))
+	f.SetCellValue("概览", "B6", task.CreateTime.Local().Format("2006-01-02 15:04:05"))
 	f.SetCellValue("概览", "A7", "资产数量")
 	f.SetCellValue("概览", "B7", len(assets))
 	f.SetCellValue("概览", "A8", "漏洞数量")
@@ -277,7 +277,7 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 		f.SetCellValue("资产列表", fmt.Sprintf("G%d", row), a.HttpStatus)
 		f.SetCellValue("资产列表", fmt.Sprintf("H%d", row), a.Server)
 		f.SetCellValue("资产列表", fmt.Sprintf("I%d", row), a.IconHash)
-		f.SetCellValue("资产列表", fmt.Sprintf("J%d", row), a.CreateTime.Format("2006-01-02 15:04:05"))
+		f.SetCellValue("资产列表", fmt.Sprintf("J%d", row), a.CreateTime.Local().Format("2006-01-02 15:04:05"))
 	}
 
 	// 漏洞Sheet
@@ -294,7 +294,7 @@ func (l *ReportExportLogic) ReportExport(req *types.ReportExportReq, workspaceId
 		f.SetCellValue("漏洞列表", fmt.Sprintf("C%d", row), v.PocFile)
 		f.SetCellValue("漏洞列表", fmt.Sprintf("D%d", row), v.Severity)
 		f.SetCellValue("漏洞列表", fmt.Sprintf("E%d", row), v.Result)
-		f.SetCellValue("漏洞列表", fmt.Sprintf("F%d", row), v.CreateTime.Format("2006-01-02 15:04:05"))
+		f.SetCellValue("漏洞列表", fmt.Sprintf("F%d", row), v.CreateTime.Local().Format("2006-01-02 15:04:05"))
 	}
 
 	// 设置列宽

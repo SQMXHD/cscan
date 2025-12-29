@@ -40,8 +40,8 @@ func (l *SubfinderLogic) ProviderList() (*types.SubfinderProviderListResp, error
 			Keys:        maskedKeys,
 			Status:      doc.Status,
 			Description: doc.Description,
-			CreateTime:  doc.CreateTime.Format("2006-01-02 15:04:05"),
-			UpdateTime:  doc.UpdateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  doc.CreateTime.Local().Format("2006-01-02 15:04:05"),
+			UpdateTime:  doc.UpdateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

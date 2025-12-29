@@ -2126,9 +2126,10 @@ function startLogStream(taskId) {
   pocValidateLogs.value = []
   currentTaskId = taskId
   
-  // 连接SSE日志流
+  // 连接SSE日志流（需要通过query参数传递token，因为EventSource不支持自定义Header）
   const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  logEventSource = new EventSource(`${baseUrl}/api/v1/worker/logs/stream`)
+  const token = localStorage.getItem('token')
+  logEventSource = new EventSource(`${baseUrl}/api/v1/worker/logs/stream?token=${token}`)
   
   logEventSource.onmessage = (event) => {
     try {
@@ -2456,8 +2457,10 @@ function startBatchLogStream(batchId) {
   
   currentBatchId = batchId
   
+  // 连接SSE日志流（需要通过query参数传递token，因为EventSource不支持自定义Header）
   const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  batchLogEventSource = new EventSource(`${baseUrl}/api/v1/worker/logs/stream`)
+  const token = localStorage.getItem('token')
+  batchLogEventSource = new EventSource(`${baseUrl}/api/v1/worker/logs/stream?token=${token}`)
   
   batchLogEventSource.onmessage = (event) => {
     try {

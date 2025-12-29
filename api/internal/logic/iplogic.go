@@ -196,7 +196,7 @@ func (l *IPLogic) IPList(req *types.IPListReq, workspaceId string) (*types.IPLis
 						DomainCount: len(domains),
 						OrgId:       asset.OrgId,
 						OrgName:     orgMap[asset.OrgId],
-						UpdateTime:  asset.UpdateTime.Format("2006-01-02 15:04:05"),
+						UpdateTime:  asset.UpdateTime.Local().Format("2006-01-02 15:04:05"),
 						IsNew:       asset.IsNewAsset,
 					}
 				}

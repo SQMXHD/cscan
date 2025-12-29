@@ -49,24 +49,25 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 	for _, pbAsset := range in.Assets {
 		// 转换为model.Asset
 		asset := &model.Asset{
-			Authority:  pbAsset.Authority,
-			Host:       pbAsset.Host,
-			Port:       int(pbAsset.Port),
-			Category:   pbAsset.Category,
-			Service:    pbAsset.Service,
-			Title:      pbAsset.Title,
-			App:        pbAsset.App,
-			HttpStatus: pbAsset.HttpStatus,
-			HttpHeader: pbAsset.HttpHeader,
-			HttpBody:   pbAsset.HttpBody,
-			IconHash:   pbAsset.IconHash,
-			Screenshot: pbAsset.Screenshot,
-			Server:     pbAsset.Server,
-			Banner:     pbAsset.Banner,
-			IsHTTP:     pbAsset.IsHttp,
-			TaskId:     in.MainTaskId,
-			Source:     pbAsset.Source,
-			OrgId:      in.OrgId,
+			Authority:     pbAsset.Authority,
+			Host:          pbAsset.Host,
+			Port:          int(pbAsset.Port),
+			Category:      pbAsset.Category,
+			Service:       pbAsset.Service,
+			Title:         pbAsset.Title,
+			App:           pbAsset.App,
+			HttpStatus:    pbAsset.HttpStatus,
+			HttpHeader:    pbAsset.HttpHeader,
+			HttpBody:      pbAsset.HttpBody,
+			IconHash:      pbAsset.IconHash,
+			IconHashBytes: pbAsset.IconData,
+			Screenshot:    pbAsset.Screenshot,
+			Server:        pbAsset.Server,
+			Banner:        pbAsset.Banner,
+			IsHTTP:        pbAsset.IsHttp,
+			TaskId:        in.MainTaskId,
+			Source:        pbAsset.Source,
+			OrgId:         in.OrgId,
 		}
 
 		// 如果Source为空，设置默认值
@@ -128,27 +129,35 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 			}
 			newAsset++
 		} else {
-			// 更新已存在的资产 - 先保存历史记录
+			// 更新已存在的资产 - 检查是否需要保存历史记录
+			// 只有当任务ID不同时才保存历史记录（同一任务多次保存不重复记录）
 			historyModel := l.svcCtx.GetAssetHistoryModel(workspaceId)
-			history := &model.AssetHistory{
-				AssetId:    existing.Id.Hex(),
-				Authority:  existing.Authority,
-				Host:       existing.Host,
-				Port:       existing.Port,
-				Service:    existing.Service,
-				Title:      existing.Title,
-				App:        existing.App,
-				HttpStatus: existing.HttpStatus,
-				HttpHeader: existing.HttpHeader,
-				HttpBody:   existing.HttpBody,
-				IconHash:   existing.IconHash,
-				Screenshot: existing.Screenshot,
-				Banner:     existing.Banner,
-				CreateTime: now,
-			}
-			if err := historyModel.Insert(l.ctx, history); err != nil {
-				l.Logger.Errorf("Insert asset history failed: %v", err)
-				// 继续更新资产，不中断
+			
+			// 检查是否已存在同一任务的历史记录
+			exists, _ := historyModel.ExistsByAssetIdAndTaskId(l.ctx, existing.Id.Hex(), in.MainTaskId)
+			if !exists {
+				// 不存在同一任务的历史记录，保存一条新记录
+				history := &model.AssetHistory{
+					AssetId:    existing.Id.Hex(),
+					Authority:  existing.Authority,
+					Host:       existing.Host,
+					Port:       existing.Port,
+					Service:    existing.Service,
+					Title:      existing.Title,
+					App:        existing.App,
+					HttpStatus: existing.HttpStatus,
+					HttpHeader: existing.HttpHeader,
+					HttpBody:   existing.HttpBody,
+					IconHash:   existing.IconHash,
+					Screenshot: existing.Screenshot,
+					Banner:     existing.Banner,
+					TaskId:     in.MainTaskId,
+					CreateTime: now,
+				}
+				if err := historyModel.Insert(l.ctx, history); err != nil {
+					l.Logger.Errorf("Insert asset history failed: %v", err)
+					// 继续更新资产，不中断
+				}
 			}
 
 			// 更新资产
@@ -169,6 +178,11 @@ func (l *SaveTaskResultLogic) SaveTaskResult(in *pb.SaveTaskResultReq) (*pb.Save
 				"update_time": now,
 				"update":      true,
 				"new":         false,
+			}
+
+			// 更新 IconData
+			if len(asset.IconHashBytes) > 0 {
+				updateFields["icon_hash_bytes"] = asset.IconHashBytes
 			}
 
 			// 更新IP信息

@@ -182,10 +182,10 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 		startTime := ""
 		endTime := ""
 		if t.StartTime != nil {
-			startTime = t.StartTime.Format("2006-01-02 15:04:05")
+			startTime = t.StartTime.Local().Format("2006-01-02 15:04:05")
 		}
 		if t.EndTime != nil {
-			endTime = t.EndTime.Format("2006-01-02 15:04:05")
+			endTime = t.EndTime.Local().Format("2006-01-02 15:04:05")
 		}
 		
 		list = append(list, types.MainTask{
@@ -202,7 +202,7 @@ func (l *MainTaskListLogic) MainTaskList(req *types.MainTaskListReq, workspaceId
 			Result:       t.Result,
 			IsCron:       t.IsCron,
 			CronRule:     t.CronRule,
-			CreateTime:   t.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:   t.CreateTime.Local().Format("2006-01-02 15:04:05"),
 			StartTime:    startTime,
 			EndTime:      endTime,
 			SubTaskCount: t.SubTaskCount,

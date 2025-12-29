@@ -50,6 +50,7 @@ type Asset struct {
 	HttpBody   string   `json:"httpBody"`
 	Cert       string   `json:"cert"`
 	IconHash   string   `json:"iconHash"`
+	IconData   []byte   `json:"iconData,omitempty"` // favicon 图片原始数据
 	Screenshot string   `json:"screenshot"`
 	IsCDN      bool     `json:"isCdn"`
 	CName      string   `json:"cname"`

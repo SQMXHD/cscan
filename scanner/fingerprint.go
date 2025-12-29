@@ -400,21 +400,15 @@ func (s *FingerprintScanner) runAdditionalFingerprint(ctx context.Context, asset
 	// 获取 IconHash 和 MMH3 hash（用于自定义指纹匹配）
 	var faviconMMH3Hash string
 	if opts.IconHash || opts.CustomEngine {
-		// 如果启用了 IconHash 或自定义指纹，都需要获取 favicon 数据
-		if asset.IconHash == "" && opts.IconHash {
-			// httpx 没有获取到 IconHash，需要补充获取
-			iconHash, iconData := s.getIconHashWithData(targetUrl)
-			if iconHash != "" {
+		// 无论 IconHash 是否已有值，都需要获取原始图片数据用于前端显示
+		iconHash, iconData := s.getIconHashWithData(targetUrl)
+		if len(iconData) > 0 {
+			// 保存 icon 图片数据
+			asset.IconData = iconData
+			faviconMMH3Hash = CalculateMMH3Hash(iconData)
+			// 如果 httpx 没有获取到 IconHash，使用我们计算的
+			if asset.IconHash == "" && iconHash != "" {
 				asset.IconHash = iconHash
-			}
-			if len(iconData) > 0 {
-				faviconMMH3Hash = CalculateMMH3Hash(iconData)
-			}
-		} else if opts.CustomEngine {
-			// 自定义指纹需要 MMH3 hash，即使 IconHash 已有也要获取原始数据
-			_, iconData := s.getIconHashWithData(targetUrl)
-			if len(iconData) > 0 {
-				faviconMMH3Hash = CalculateMMH3Hash(iconData)
 			}
 		}
 	}
@@ -559,7 +553,7 @@ func (s *FingerprintScanner) fingerprint(ctx context.Context, asset *Asset, opts
 
 		// 提取信息
 		asset.HttpStatus = fmt.Sprintf("%d", resp.StatusCode)
-		asset.HttpHeader = formatHeaders(resp.Header)
+		asset.HttpHeader = formatHeadersWithStatus(resp.Header, resp.StatusCode, resp.Proto)
 		// 限制HttpBody大小为50KB
 		if len(body) > 50*1024 {
 			asset.HttpBody = string(body[:50*1024]) + "\n...[truncated]"
@@ -580,6 +574,8 @@ func (s *FingerprintScanner) fingerprint(ctx context.Context, asset *Asset, opts
 			// 计算MMH3 hash用于ARL格式指纹匹配
 			if len(iconData) > 0 {
 				faviconMMH3Hash = CalculateMMH3Hash(iconData)
+				// 保存 icon 图片数据
+				asset.IconData = iconData
 			}
 		}
 
@@ -819,9 +815,9 @@ func (s *FingerprintScanner) runHttpx(ctx context.Context, assets []*Asset, opts
 			if result.Response != "" {
 				asset.HttpHeader = extractHeadersFromResponse(result.Response)
 			}
-			// 如果Response为空，使用ResponseHeader map
+			// 如果Response为空，使用ResponseHeader map，并添加状态行
 			if asset.HttpHeader == "" && len(result.ResponseHeader) > 0 {
-				asset.HttpHeader = formatHttpxHeaders(result.ResponseHeader)
+				asset.HttpHeader = formatHttpxHeadersWithStatus(result.ResponseHeader, result.StatusCode)
 			}
 			// 填充HttpBody字段
 			bodyContent := result.ResponseBody
@@ -1023,9 +1019,46 @@ func formatHeaders(headers http.Header) string {
 	return sb.String()
 }
 
+// formatHeadersWithStatus 格式化响应头，包含HTTP状态行
+func formatHeadersWithStatus(headers http.Header, statusCode int, proto string) string {
+	var sb strings.Builder
+	// 添加HTTP状态行
+	if proto == "" {
+		proto = "HTTP/1.1"
+	}
+	statusText := http.StatusText(statusCode)
+	if statusText == "" {
+		statusText = "Unknown"
+	}
+	sb.WriteString(fmt.Sprintf("%s %d %s\n", proto, statusCode, statusText))
+	// 添加headers
+	for key, values := range headers {
+		for _, value := range values {
+			sb.WriteString(fmt.Sprintf("%s: %s\n", key, value))
+		}
+	}
+	return sb.String()
+}
+
 // formatHttpxHeaders 格式化httpx返回的响应头
 func formatHttpxHeaders(headers map[string]string) string {
 	var sb strings.Builder
+	for key, value := range headers {
+		sb.WriteString(fmt.Sprintf("%s: %s\n", key, value))
+	}
+	return sb.String()
+}
+
+// formatHttpxHeadersWithStatus 格式化httpx返回的响应头，包含HTTP状态行
+func formatHttpxHeadersWithStatus(headers map[string]string, statusCode int) string {
+	var sb strings.Builder
+	// 添加HTTP状态行
+	statusText := http.StatusText(statusCode)
+	if statusText == "" {
+		statusText = "Unknown"
+	}
+	sb.WriteString(fmt.Sprintf("HTTP/1.1 %d %s\n", statusCode, statusText))
+	// 添加headers
 	for key, value := range headers {
 		sb.WriteString(fmt.Sprintf("%s: %s\n", key, value))
 	}

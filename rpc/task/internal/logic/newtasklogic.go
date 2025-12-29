@@ -44,7 +44,7 @@ func (l *NewTaskLogic) NewTask(in *pb.NewTaskReq) (*pb.NewTaskResp, error) {
 		TaskName:    in.TaskName,
 		Config:      in.Config,
 		WorkspaceId: in.WorkspaceId,
-		CreateTime:  time.Now().Format("2006-01-02 15:04:05"),
+		CreateTime:  time.Now().Local().Format("2006-01-02 15:04:05"),
 	}
 
 	// 序列化任务信息

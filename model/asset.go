@@ -344,6 +344,74 @@ type PortStatResult struct {
 	Count int `bson:"count"`
 }
 
+// AggregateApp 专门用于app字段统计（app是数组类型，需要先展开）
+func (m *AssetModel) AggregateApp(ctx context.Context, limit int) ([]StatResult, error) {
+	pipeline := mongo.Pipeline{
+		// 先过滤掉app为空的资产
+		{{Key: "$match", Value: bson.D{
+			{Key: "app", Value: bson.D{{Key: "$exists", Value: true}, {Key: "$ne", Value: nil}, {Key: "$ne", Value: bson.A{}}}},
+		}}},
+		// 展开app数组
+		{{Key: "$unwind", Value: "$app"}},
+		// 按app分组统计
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$app"},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := m.coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []StatResult
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// IconHashStatResult IconHash统计结果（包含图片数据）
+type IconHashStatResult struct {
+	IconHash string `bson:"_id"`
+	IconData []byte `bson:"iconData"`
+	Count    int    `bson:"count"`
+}
+
+// AggregateIconHash 统计 IconHash（包含图片数据）
+func (m *AssetModel) AggregateIconHash(ctx context.Context, limit int) ([]IconHashStatResult, error) {
+	pipeline := mongo.Pipeline{
+		// 过滤有 icon_hash 的资产
+		{{Key: "$match", Value: bson.D{
+			{Key: "icon_hash", Value: bson.D{{Key: "$exists", Value: true}, {Key: "$ne", Value: ""}}},
+		}}},
+		// 按 icon_hash 分组，取第一个图片数据
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$icon_hash"},
+			{Key: "iconData", Value: bson.D{{Key: "$first", Value: "$icon_hash_bytes"}}},
+			{Key: "count", Value: bson.D{{Key: "$sum", Value: 1}}},
+		}}},
+		{{Key: "$sort", Value: bson.D{{Key: "count", Value: -1}}}},
+		{{Key: "$limit", Value: limit}},
+	}
+
+	cursor, err := m.coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []IconHashStatResult
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // AssetHistory 资产历史记录
 type AssetHistory struct {
 	Id         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
@@ -431,6 +499,15 @@ func (m *AssetHistoryModel) Clear(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return result.DeletedCount, nil
+}
+
+// ExistsByAssetIdAndTaskId 检查是否已存在同一资产同一任务的历史记录
+func (m *AssetHistoryModel) ExistsByAssetIdAndTaskId(ctx context.Context, assetId, taskId string) (bool, error) {
+	count, err := m.coll.CountDocuments(ctx, bson.M{"assetId": assetId, "taskId": taskId})
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // Upsert 插入或更新资产

@@ -46,7 +46,7 @@ func (l *OrganizationListLogic) OrganizationList(req *types.PageReq) (resp *type
 			Name:        o.Name,
 			Description: o.Description,
 			Status:      o.Status,
-			CreateTime:  o.CreateTime.Format("2006-01-02 15:04:05"),
+			CreateTime:  o.CreateTime.Local().Format("2006-01-02 15:04:05"),
 		})
 	}
 

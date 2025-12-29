@@ -122,7 +122,7 @@ func WorkerLogsHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		// 发送连接成功消息
 		fmt.Fprintf(w, "data: {\"level\":\"INFO\",\"message\":\"日志流连接成功，等待Worker日志...\",\"timestamp\":\"%s\",\"workerName\":\"API\"}\n\n",
-			time.Now().Format("2006-01-02 15:04:05"))
+			time.Now().Local().Format("2006-01-02 15:04:05"))
 		flusher.Flush()
 
 		// 先发送最近的历史日志

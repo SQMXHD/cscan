@@ -149,7 +149,7 @@ func (l *DomainLogic) DomainList(req *types.DomainListReq, workspaceId string) (
 					OrgId:      asset.OrgId,
 					OrgName:    orgMap[asset.OrgId],
 					IsNew:      asset.IsNewAsset,
-					CreateTime: asset.CreateTime.Format("2006-01-02 15:04:05"),
+					CreateTime: asset.CreateTime.Local().Format("2006-01-02 15:04:05"),
 				}
 			}
 		}

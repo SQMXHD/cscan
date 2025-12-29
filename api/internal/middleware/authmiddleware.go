@@ -30,22 +30,30 @@ func NewAuthMiddleware(accessSecret string) *AuthMiddleware {
 
 func (m *AuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// 从Header获取Token
+		var tokenStr string
+
+		// 优先从Header获取Token
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			// 解析Bearer Token
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tokenStr = parts[1]
+			}
+		}
+
+		// 如果Header中没有，尝试从URL查询参数获取（用于SSE等不支持自定义Header的场景）
+		if tokenStr == "" {
+			tokenStr = r.URL.Query().Get("token")
+		}
+
+		if tokenStr == "" {
 			unauthorized(w, "未提供认证信息")
 			return
 		}
 
-		// 解析Bearer Token
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			unauthorized(w, "认证格式错误")
-			return
-		}
-
 		// 验证Token
-		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
 			return []byte(m.AccessSecret), nil
 		})
 		if err != nil || !token.Valid {

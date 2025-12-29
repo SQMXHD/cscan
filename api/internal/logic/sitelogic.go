@@ -131,7 +131,7 @@ func (l *SiteLogic) SiteList(req *types.SiteListReq, workspaceId string) (*types
 				site.OrgName = orgMap[asset.OrgId]
 			}
 
-			site.UpdateTime = asset.UpdateTime.Format("2006-01-02 15:04:05")
+			site.UpdateTime = asset.UpdateTime.Local().Format("2006-01-02 15:04:05")
 			allSites = append(allSites, site)
 		}
 	}

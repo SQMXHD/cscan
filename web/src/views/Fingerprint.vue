@@ -674,12 +674,23 @@
             </div>
           </template>
         </el-alert>
+        <div style="margin-top: 15px">
+          <el-checkbox v-model="matchAssetsUpdateAsset">
+            匹配成功后自动更新资产的指纹信息
+          </el-checkbox>
+          <div style="font-size: 12px; color: #909399; margin-top: 5px; margin-left: 24px">
+            勾选后，匹配到的资产将自动添加该指纹名称到其应用指纹列表中
+          </div>
+        </div>
       </div>
       
       <div v-if="matchAssetsResult" class="match-assets-result">
         <div class="result-header">
           <el-tag type="success" size="large">
             共匹配到 {{ matchAssetsResult.matchedCount }} 个资产
+          </el-tag>
+          <el-tag v-if="matchAssetsResult.updatedCount > 0" type="warning" size="large" style="margin-left: 10px">
+            已更新 {{ matchAssetsResult.updatedCount }} 个资产
           </el-tag>
           <span style="margin-left: 10px; color: #909399; font-size: 13px">
             扫描 {{ matchAssetsResult.totalScanned }} 个资产，耗时: {{ matchAssetsResult.duration }}
@@ -785,6 +796,7 @@ const matchAssetsDialogVisible = ref(false)
 const matchAssetsFingerprint = ref({})
 const matchAssetsResult = ref(null)
 const matchAssetsLoading = ref(false)
+const matchAssetsUpdateAsset = ref(true) // 默认勾选更新资产
 
 // 详情对话框
 const detailDialogVisible = ref(false)
@@ -1460,6 +1472,7 @@ async function handleBatchValidate() {
 function showMatchAssetsDialog(row) {
   matchAssetsFingerprint.value = row
   matchAssetsResult.value = null
+  matchAssetsUpdateAsset.value = true // 重置为默认勾选
   matchAssetsDialogVisible.value = true
 }
 
@@ -1471,15 +1484,20 @@ async function handleMatchAssets() {
   try {
     const res = await matchFingerprintAssets({
       fingerprintId: matchAssetsFingerprint.value.id,
-      limit: 100
+      limit: 100,
+      updateAsset: matchAssetsUpdateAsset.value
     })
 
     if (res.code === 0) {
       matchAssetsResult.value = {
         matchedCount: res.matchedCount,
         totalScanned: res.totalScanned,
+        updatedCount: res.updatedCount || 0,
         duration: res.duration,
         matchedList: res.matchedList || []
+      }
+      if (res.updatedCount > 0) {
+        ElMessage.success(`已更新 ${res.updatedCount} 个资产的指纹信息`)
       }
     } else {
       ElMessage.error(res.msg || '匹配失败')

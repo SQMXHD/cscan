@@ -108,6 +108,7 @@ message AssetDocument {
   string screenshot = 20;
   bool isHttp = 21;
   string source = 22;  // 资产来源: subfinder, portscan, etc.
+  bytes iconData = 23; // favicon 图片原始数据
 }
 
 message IPV4 {

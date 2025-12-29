@@ -168,10 +168,18 @@ func (s *NucleiScanner) Scan(ctx context.Context, config *ScanConfig) (*ScanResu
 		} else {
 			for i, content := range opts.CustomTemplates {
 				templatePath := filepath.Join(tempDir, fmt.Sprintf("custom-%d.yaml", i))
+				// 调试：输出模板内容的前200个字符
+				contentPreview := content
+				if len(contentPreview) > 200 {
+					contentPreview = contentPreview[:200] + "..."
+				}
+				logx.Debugf("Custom template %d content preview: %s", i, contentPreview)
+				
 				if err := os.WriteFile(templatePath, []byte(content), 0644); err != nil {
 					logx.Errorf("Failed to write custom template %d: %v", i, err)
 					continue
 				}
+				logx.Debugf("Custom template %d written to: %s", i, templatePath)
 				customTemplatePaths = append(customTemplatePaths, templatePath)
 				// 尝试从内容中提取模板ID/名称
 				templateName := extractTemplateId(content)
@@ -276,12 +284,23 @@ func (s *NucleiScanner) scanSingleTarget(ctx context.Context, target string, opt
 		if taskLogger != nil {
 			taskLogger("ERROR", "Failed to load templates: %v", err)
 		}
+		// 如果加载失败，返回空结果
+		return vuls
 	}
 
 	// 获取实际加载的模板数量
 	loadedTemplates := ne.GetTemplates()
 	actualTemplateCount := len(loadedTemplates)
 	logx.Debugf("Loaded %d templates for %s (input: %d)", actualTemplateCount, target, len(customTemplatePaths))
+	
+	// 如果没有加载到任何模板，记录警告并返回
+	if actualTemplateCount == 0 {
+		logx.Errorf("No templates loaded for %s, skipping scan", target)
+		if taskLogger != nil {
+			taskLogger("WARN", "No templates loaded, skipping scan")
+		}
+		return vuls
+	}
 	
 	// 输出实际加载的模板数量（可能因severity过滤而减少）
 	if taskLogger != nil {
