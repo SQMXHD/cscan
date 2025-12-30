@@ -729,7 +729,7 @@ func (s *FingerprintScanner) runHttpx(ctx context.Context, assets []*Asset, opts
 		"-max-redirects", "5", // 最大重定向次数
 	}
 	if opts.Screenshot {
-		args = append(args, "-screenshot")
+		args = append(args, "-screenshot", "-system-chrome")
 	}
 
 	logx.Infof("Executing command: httpx %s", strings.Join(args, " "))
