@@ -88,87 +88,7 @@ Vue3 Web ──▶ API Server ──▶ MongoDB
 </details>
 
 <details>
-<summary>⭐ 本地开发 </summary>
-
-```bash
-# 1. 启动依赖服务（MongoDB + Redis）
-docker-compose -f docker-compose.dev.yaml up -d
-
-# 2. 启动 RPC 服务
-go run rpc/task/task.go -f rpc/task/etc/task.yaml
-
-# 3. 启动 API 服务
-go run api/cscan.go -f api/etc/cscan.yaml
-
-# 4. 启动 Worker（可启动多个）
-go run cmd/worker/main.go -s localhost:9000 -r localhost:6379
-
-# 5. 启动前端
-cd web && npm install && npm run dev
-```
-
-### Worker 参数说明
-
-```bash
-go run cmd/worker/main.go [options]
-  -s string    RPC 服务地址 (默认 "localhost:9000")
-  -r string    Redis 地址 (默认 "localhost:6379")
-  -rp string   Redis 密码 (默认 "")
-  -n string    Worker 名称 (默认 主机名)
-  -c int       并发数 (默认 5)
-```
-
-### 服务说明
-
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| cscan-web | 3000 | Web 前端 |
-| cscan-api | 8080 | API 服务 |
-| cscan-rpc | 9000 | RPC 服务 |
-| cscan-worker | - | 扫描节点 |
-| mongodb | 27017 | 数据库 |
-| redis | 6379 | 缓存/消息队列 |
-
-### 扩展 Worker 节点
-
-```bash
-docker-compose up -d --scale cscan-worker=3
-```
-</details>
-
-<details>
-<summary>⭐ 项目结构 </summary>
-
-```
-├── api/            # HTTP API 服务
-│   ├── internal/   # 内部实现
-│   │   ├── handler/  # 请求处理器
-│   │   ├── logic/    # 业务逻辑
-│   │   ├── svc/      # 服务上下文
-│   │   └── types/    # 类型定义
-│   └── etc/        # 配置文件
-├── rpc/            # gRPC 服务
-│   └── task/       # 任务服务
-├── worker/         # 扫描 Worker
-├── scanner/        # 扫描器实现
-│   ├── portscan.go   # 端口扫描
-│   ├── fingerprint.go # 指纹识别
-│   ├── nuclei.go     # 漏洞扫描
-│   └── ...
-├── model/          # 数据模型
-├── scheduler/      # 任务调度器
-├── onlineapi/      # FOFA/Hunter/Quake 集成
-├── pkg/            # 公共包
-│   ├── xerr/       # 错误码定义
-│   └── response/   # 响应封装
-├── web/            # Vue3 前端
-├── docker/         # Docker 配置
-└── poc/            # POC 文件
-```
-</details>
-
-
-## 参考
+<summary>⭐ 参考 </summary>
 
 - [go-zero](https://github.com/zeromicro/go-zero) - 微服务框架
 - [Nuclei](https://github.com/projectdiscovery/nuclei) - 漏洞扫描引擎
@@ -176,6 +96,7 @@ docker-compose up -d --scale cscan-worker=3
 - [Naabu](https://github.com/projectdiscovery/naabu) - 端口扫描器
 - [Wappalyzer](https://github.com/projectdiscovery/wappalyzergo) - 指纹识别
 - [nemo_go](https://github.com/hanc00l/nemo_go) - 参考项目
+</details>
 
 ## License
 

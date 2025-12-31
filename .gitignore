@@ -5,3 +5,6 @@ web/dist/
 .vscode/
 output/
 .DS_Store
+poc/
+docker-compose.dev.yaml
+DEV.md
