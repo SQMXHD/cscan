@@ -460,34 +460,59 @@
     <el-dialog v-model="importPocDialogVisible" title="导入POC" width="900px">
       <el-form label-width="100px">
         <el-form-item label="POC格式">
-          <el-radio-group v-model="importPocFormat">
+          <el-radio-group v-model="importPocFormat" @change="handleImportFormatChange">
             <el-radio-button value="nuclei">Nuclei</el-radio-button>
             <el-radio-button value="xray">XRAY (自动转换)</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="导入方式">
+        <el-form-item label="导入方式" v-if="importPocFormat === 'xray'">
           <el-radio-group v-model="importPocType">
             <el-radio-button value="text">文本粘贴</el-radio-button>
             <el-radio-button value="file">文件上传</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="importPocType === 'text'" label="POC内容">
+        <!-- Nuclei格式：从本地文件夹导入 -->
+        <el-form-item v-if="importPocFormat === 'nuclei'" label="选择文件夹">
+          <div style="width: 100%">
+            <el-button type="primary" @click="customPocFolderInputRef?.click()" :loading="importPocLoading">
+              <el-icon><FolderOpened /></el-icon>选择本地文件夹
+            </el-button>
+            <input 
+              ref="customPocFolderInputRef" 
+              type="file" 
+              webkitdirectory 
+              directory 
+              multiple 
+              style="display: none" 
+              @change="handleCustomPocFolderSelect"
+            />
+            <div style="margin-top: 8px; color: #909399; font-size: 12px">
+              选择包含 Nuclei YAML 模板的文件夹，将自动扫描所有 .yaml/.yml 文件
+            </div>
+            <div v-if="uploadedFileCount > 0" style="margin-top: 10px; color: #67c23a; font-size: 13px">
+              <el-icon><UploadFilled /></el-icon> 已扫描 {{ uploadedFileCount }} 个文件
+            </div>
+          </div>
+        </el-form-item>
+        <!-- XRAY格式：文本粘贴 -->
+        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'text'" label="POC内容">
           <div style="width: 100%">
             <div style="margin-bottom: 8px; color: #909399; font-size: 12px">
-              {{ importPocFormat === 'xray' ? '粘贴 XRAY YAML POC 内容，将自动转换为 Nuclei 格式' : '粘贴 Nuclei YAML 模板内容' }}，支持一次导入多个POC（用 --- 分隔）
+              粘贴 XRAY YAML POC 内容，将自动转换为 Nuclei 格式，支持一次导入多个POC（用 --- 分隔）
             </div>
             <div class="yaml-editor-wrapper">
               <el-input
                 v-model="importPocContent"
                 type="textarea"
                 :rows="18"
-                :placeholder="importPocFormat === 'xray' ? '粘贴 XRAY YAML POC 内容...' : '粘贴 Nuclei YAML 模板内容...'"
+                placeholder="粘贴 XRAY YAML POC 内容..."
                 @input="parseImportContent"
               />
             </div>
           </div>
         </el-form-item>
-        <el-form-item v-else label="上传文件">
+        <!-- XRAY格式：文件上传 -->
+        <el-form-item v-if="importPocFormat === 'xray' && importPocType === 'file'" label="上传文件">
           <div style="width: 100%">
             <el-upload
               ref="importPocUploadRef"
@@ -506,7 +531,7 @@
               <template #tip>
                 <div class="el-upload__tip">
                   支持 .yaml / .yml 文件，可批量选择多个文件
-                  <span v-if="importPocFormat === 'xray'" style="color: #e6a23c">（XRAY格式将自动转换为Nuclei格式）</span>
+                  <span style="color: #e6a23c">（XRAY格式将自动转换为Nuclei格式）</span>
                 </div>
               </template>
             </el-upload>
@@ -517,11 +542,11 @@
         </el-form-item>
       </el-form>
       
-      <!-- 解析预览 -->
-      <div v-if="importPocPreviews.length > 0" class="import-preview">
+      <!-- 解析预览（仅XRAY格式显示） -->
+      <div v-if="importPocFormat === 'xray' && importPocPreviews.length > 0" class="import-preview">
         <div class="preview-header">
           <span>解析预览 ({{ importPocPreviews.length }} 个POC)</span>
-          <el-tag v-if="importPocFormat === 'xray'" type="warning" size="small" style="margin-left: 10px">已转换为Nuclei格式</el-tag>
+          <el-tag type="warning" size="small" style="margin-left: 10px">已转换为Nuclei格式</el-tag>
           <el-checkbox v-model="importPocEnabled" style="margin-left: 15px">导入后启用</el-checkbox>
         </div>
         <el-table :data="importPocPreviews" max-height="300" size="small">
@@ -552,8 +577,8 @@
       
       <template #footer>
         <el-button @click="importPocDialogVisible = false">取消</el-button>
-        <el-button @click="clearImportContent">清空</el-button>
-        <el-button type="primary" @click="handleImportPocs" :loading="importPocLoading" :disabled="importPocPreviews.length === 0">
+        <el-button v-if="importPocFormat === 'xray'" @click="clearImportContent">清空</el-button>
+        <el-button v-if="importPocFormat === 'xray'" type="primary" @click="handleImportPocs" :loading="importPocLoading" :disabled="importPocPreviews.length === 0">
           导入 ({{ importPocPreviews.length }})
         </el-button>
       </template>
@@ -844,7 +869,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick } from '@element-plus/icons-vue'
+import { Plus, Refresh, ArrowDown, UploadFilled, Upload, Download, Delete, MagicStick, FolderOpened } from '@element-plus/icons-vue'
 import { getTagMappingList, saveTagMapping, deleteTagMapping, getCustomPocList, saveCustomPoc, batchImportCustomPoc, deleteCustomPoc, clearAllCustomPoc, getNucleiTemplateList, getNucleiTemplateCategories, syncNucleiTemplates, clearNucleiTemplates, getNucleiTemplateDetail, validatePoc as validatePocApi, getPocValidationResult, scanAssetsWithPoc, getAIConfig, saveAIConfig, validatePocSyntax } from '@/api/poc'
 import jsYaml from 'js-yaml'
 import JSZip from 'jszip'
@@ -1059,6 +1084,7 @@ const importPocEnabled = ref(true)
 const importPocLoading = ref(false)
 const uploadedFileCount = ref(0)
 const importPocUploadRef = ref(null)
+const customPocFolderInputRef = ref(null)
 const convertedPocPreviewVisible = ref(false)
 const convertedPocPreviewContent = ref('')
 const exportPocLoading = ref(false)
@@ -1628,16 +1654,34 @@ async function handleExportPocs() {
   }
 }
 
-// 清空所有自定义POC
+// 清空自定义POC（按当前筛选条件）
 async function handleClearAllPocs() {
   if (customPocs.value.length === 0 && pocPagination.total === 0) {
     ElMessage.warning('没有可清空的POC')
     return
   }
   
+  // 检查是否有筛选条件
+  const hasFilter = customPocFilter.name || customPocFilter.templateId || customPocFilter.severity || customPocFilter.tag || customPocFilter.enabled !== null
+  
+  // 构建提示信息
+  let confirmMsg = ''
+  if (hasFilter) {
+    const filterDesc = []
+    if (customPocFilter.name) filterDesc.push(`名称含"${customPocFilter.name}"`)
+    if (customPocFilter.templateId) filterDesc.push(`模板ID含"${customPocFilter.templateId}"`)
+    if (customPocFilter.severity) filterDesc.push(`级别为"${customPocFilter.severity}"`)
+    if (customPocFilter.tag) filterDesc.push(`标签含"${customPocFilter.tag}"`)
+    if (customPocFilter.enabled === true) filterDesc.push('状态为启用')
+    if (customPocFilter.enabled === false) filterDesc.push('状态为禁用')
+    confirmMsg = `确定要清空符合条件的POC吗？\n筛选条件：${filterDesc.join('、')}\n共 ${pocPagination.total} 个POC将被删除，此操作不可恢复！`
+  } else {
+    confirmMsg = `确定要清空所有自定义POC吗？共 ${pocPagination.total} 个POC将被删除，此操作不可恢复！`
+  }
+  
   try {
     await ElMessageBox.confirm(
-      `确定要清空所有自定义POC吗？共 ${pocPagination.total} 个POC将被删除，此操作不可恢复！`,
+      confirmMsg,
       '危险操作',
       {
         type: 'warning',
@@ -1649,7 +1693,15 @@ async function handleClearAllPocs() {
     
     clearPocLoading.value = true
     
-    const res = await clearAllCustomPoc()
+    // 传递筛选条件
+    const params = {}
+    if (customPocFilter.name) params.name = customPocFilter.name
+    if (customPocFilter.templateId) params.templateId = customPocFilter.templateId
+    if (customPocFilter.severity) params.severity = customPocFilter.severity
+    if (customPocFilter.tag) params.tag = customPocFilter.tag
+    if (customPocFilter.enabled !== null && customPocFilter.enabled !== '') params.enabled = customPocFilter.enabled
+    
+    const res = await clearAllCustomPoc(params)
     if (res.code === 0) {
       ElMessage.success(`成功清空 ${res.deleted || pocPagination.total} 个POC`)
       loadCustomPocs()
@@ -1677,6 +1729,100 @@ function showImportPocDialog() {
   importPocEnabled.value = true
   uploadedFileCount.value = 0
   importPocDialogVisible.value = true
+}
+
+// 处理导入格式切换
+function handleImportFormatChange() {
+  // 切换格式时清空预览
+  importPocPreviews.value = []
+  importPocContent.value = ''
+  uploadedFileCount.value = 0
+  if (importPocUploadRef.value) {
+    importPocUploadRef.value.clearFiles()
+  }
+}
+
+// 处理自定义POC文件夹选择（Nuclei格式，直接导入）
+async function handleCustomPocFolderSelect(event) {
+  const files = event.target.files
+  if (!files || files.length === 0) return
+  
+  // 筛选 .yaml 和 .yml 文件
+  const yamlFiles = Array.from(files).filter(file => {
+    const name = file.name.toLowerCase()
+    return (name.endsWith('.yaml') || name.endsWith('.yml')) && !file.webkitRelativePath.includes('/.git/')
+  })
+  
+  if (yamlFiles.length === 0) {
+    ElMessage.warning('未找到有效的模板文件（.yaml/.yml）')
+    event.target.value = ''
+    return
+  }
+  
+  ElMessage.info(`正在导入 ${yamlFiles.length} 个模板文件...`)
+  uploadedFileCount.value = yamlFiles.length
+  importPocLoading.value = true
+  
+  const pocsToImport = []
+  const seenTemplateIds = new Set()
+  const seenContents = new Set()
+  
+  for (const file of yamlFiles) {
+    try {
+      const content = await readFileContent(file)
+      if (!content || content.trim().length === 0) continue
+      
+      const parsed = parseYamlToPreview(content)
+      if (parsed) {
+        // 检查是否已存在相同templateId或相同内容
+        const contentHash = parsed.content.trim()
+        if (!seenTemplateIds.has(parsed.templateId) && !seenContents.has(contentHash)) {
+          seenTemplateIds.add(parsed.templateId)
+          seenContents.add(contentHash)
+          pocsToImport.push({
+            name: parsed.name,
+            templateId: parsed.templateId,
+            severity: parsed.severity,
+            tags: parsed.tags,
+            author: parsed.author,
+            description: parsed.description,
+            content: parsed.content,
+            enabled: importPocEnabled.value
+          })
+        }
+      }
+    } catch (e) {
+      console.error('读取文件失败:', file.name, e)
+    }
+  }
+  
+  if (pocsToImport.length === 0) {
+    ElMessage.warning('未能解析任何有效的POC文件')
+    importPocLoading.value = false
+    event.target.value = ''
+    return
+  }
+  
+  // 直接批量导入
+  try {
+    const res = await batchImportCustomPoc({ pocs: pocsToImport })
+    
+    if (res.code === 0) {
+      const successCount = res.imported || pocsToImport.length
+      const failCount = res.failed || 0
+      ElMessage.success(res.msg || `成功导入 ${successCount} 个POC${failCount > 0 ? `，${failCount} 个失败` : ''}`)
+      importPocDialogVisible.value = false
+      loadCustomPocs()
+    } else {
+      ElMessage.error(res.msg || '导入失败')
+    }
+  } catch (e) {
+    console.error('批量导入失败:', e)
+    ElMessage.error('导入失败: ' + e.message)
+  } finally {
+    importPocLoading.value = false
+    event.target.value = '' // 清空input以便重复选择
+  }
 }
 
 // 解析导入的YAML内容

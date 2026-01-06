@@ -436,6 +436,7 @@ type MainTask struct {
 	EndTime      string `json:"endTime"`    // 结束时间
 	SubTaskCount int    `json:"subTaskCount"` // 子任务总数
 	SubTaskDone  int    `json:"subTaskDone"`  // 已完成子任务数
+	WorkspaceId  string `json:"workspaceId"`  // 所属工作空间ID
 }
 
 type MainTaskListReq struct {
@@ -453,14 +454,15 @@ type MainTaskListResp struct {
 }
 
 type MainTaskCreateReq struct {
-	Name      string   `json:"name"`
-	Target    string   `json:"target"`
-	ProfileId string   `json:"profileId,optional"` // 可选，兼容旧版
-	Config    string   `json:"config,optional"`    // 直接传递配置JSON
-	OrgId     string   `json:"orgId,optional"`
-	IsCron    bool     `json:"isCron,optional"`
-	CronRule  string   `json:"cronRule,optional"`
-	Workers   []string `json:"workers,optional"` // 指定执行任务的 Worker 列表
+	Name        string   `json:"name"`
+	Target      string   `json:"target"`
+	ProfileId   string   `json:"profileId,optional"` // 可选，兼容旧版
+	Config      string   `json:"config,optional"`    // 直接传递配置JSON
+	OrgId       string   `json:"orgId,optional"`
+	IsCron      bool     `json:"isCron,optional"`
+	CronRule    string   `json:"cronRule,optional"`
+	Workers     []string `json:"workers,optional"`     // 指定执行任务的 Worker 列表
+	WorkspaceId string   `json:"workspaceId,optional"` // 任务所属工作空间ID
 }
 
 type TaskProfile struct {
@@ -500,7 +502,8 @@ type MainTaskRetryReq struct {
 }
 
 type MainTaskControlReq struct {
-	Id string `json:"id"`
+	Id          string `json:"id"`
+	WorkspaceId string `json:"workspaceId,optional"` // 任务所属工作空间ID
 }
 
 // MainTaskUpdateReq 更新任务请求
@@ -888,7 +891,16 @@ type CustomPocBatchImportResp struct {
 	Errors   []string `json:"errors"` // 错误信息列表
 }
 
-// CustomPocClearAllResp 清空所有自定义POC响应
+// CustomPocClearAllReq 清空自定义POC请求（支持按筛选条件清空）
+type CustomPocClearAllReq struct {
+	Name       string `json:"name,optional"`       // 按名称筛选
+	TemplateId string `json:"templateId,optional"` // 按模板ID筛选
+	Severity   string `json:"severity,optional"`   // 按严重级别筛选
+	Tag        string `json:"tag,optional"`        // 按标签筛选
+	Enabled    *bool  `json:"enabled,optional"`    // 按状态筛选
+}
+
+// CustomPocClearAllResp 清空自定义POC响应
 type CustomPocClearAllResp struct {
 	Code    int    `json:"code"`
 	Msg     string `json:"msg"`

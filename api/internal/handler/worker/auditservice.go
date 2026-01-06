@@ -27,6 +27,11 @@ func NewAuditService(svcCtx *svc.ServiceContext) *AuditService {
 
 // RecordFileOperation 记录文件操作
 func (s *AuditService) RecordFileOperation(ctx context.Context, r *http.Request, logType model.AuditLogType, workerName, path string, success bool, errMsg string, duration time.Duration) {
+	// 在 goroutine 之前提取用户信息，避免 context 失效
+	userId := middleware.GetUserId(ctx)
+	username := middleware.GetUsername(ctx)
+	clientIP := getClientIPFromReq(r)
+
 	go func() {
 		auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -34,9 +39,9 @@ func (s *AuditService) RecordFileOperation(ctx context.Context, r *http.Request,
 		log := &model.AuditLog{
 			Type:       logType,
 			WorkerName: workerName,
-			UserId:     middleware.GetUserId(ctx),
-			Username:   middleware.GetUsername(ctx),
-			ClientIP:   getClientIPFromReq(r),
+			UserId:     userId,
+			Username:   username,
+			ClientIP:   clientIP,
 			Path:       path,
 			Success:    success,
 			Error:      errMsg,
@@ -52,6 +57,11 @@ func (s *AuditService) RecordFileOperation(ctx context.Context, r *http.Request,
 
 // RecordTerminalOperation 记录终端操作
 func (s *AuditService) RecordTerminalOperation(ctx context.Context, r *http.Request, logType model.AuditLogType, workerName, sessionId, command string, success bool, errMsg string, duration time.Duration) {
+	// 在 goroutine 之前提取用户信息，避免 context 失效
+	userId := middleware.GetUserId(ctx)
+	username := middleware.GetUsername(ctx)
+	clientIP := getClientIPFromReq(r)
+
 	go func() {
 		auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -59,9 +69,9 @@ func (s *AuditService) RecordTerminalOperation(ctx context.Context, r *http.Requ
 		log := &model.AuditLog{
 			Type:       logType,
 			WorkerName: workerName,
-			UserId:     middleware.GetUserId(ctx),
-			Username:   middleware.GetUsername(ctx),
-			ClientIP:   getClientIPFromReq(r),
+			UserId:     userId,
+			Username:   username,
+			ClientIP:   clientIP,
 			SessionId:  sessionId,
 			Command:    command,
 			Success:    success,
@@ -78,6 +88,11 @@ func (s *AuditService) RecordTerminalOperation(ctx context.Context, r *http.Requ
 
 // RecordConsoleAccess 记录控制台访问
 func (s *AuditService) RecordConsoleAccess(ctx context.Context, r *http.Request, workerName string, success bool, errMsg string) {
+	// 在 goroutine 之前提取用户信息，避免 context 失效
+	userId := middleware.GetUserId(ctx)
+	username := middleware.GetUsername(ctx)
+	clientIP := getClientIPFromReq(r)
+
 	go func() {
 		auditCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -85,9 +100,9 @@ func (s *AuditService) RecordConsoleAccess(ctx context.Context, r *http.Request,
 		log := &model.AuditLog{
 			Type:       model.AuditLogTypeConsoleInfo,
 			WorkerName: workerName,
-			UserId:     middleware.GetUserId(ctx),
-			Username:   middleware.GetUsername(ctx),
-			ClientIP:   getClientIPFromReq(r),
+			UserId:     userId,
+			Username:   username,
+			ClientIP:   clientIP,
 			Success:    success,
 			Error:      errMsg,
 			CreateTime: time.Now(),

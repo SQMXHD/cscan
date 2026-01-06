@@ -282,6 +282,8 @@ func (w *Worker) handleWorkerControl(action, param string) {
 		w.config.Name = param
 		// 更新日志前缀（使用 WebSocket 版本）
 		w.logger = NewWorkerLoggerWS(param, w.wsClient)
+		// 立即发送心跳，让服务端更新状态
+		go w.sendHeartbeat()
 	case "setConcurrency":
 		newConcurrency, err := strconv.Atoi(param)
 		if err != nil || newConcurrency < 1 {
@@ -291,6 +293,8 @@ func (w *Worker) handleWorkerControl(action, param string) {
 		w.logger.Info("Setting concurrency to: %d", newConcurrency)
 		w.config.Concurrency = newConcurrency
 		// 注意：增加并发数需要重启才能生效，减少并发数会在任务完成后自然生效
+		// 立即发送心跳，让服务端更新状态
+		go w.sendHeartbeat()
 	default:
 		w.logger.Warn("Unknown worker control action: %s", action)
 	}
@@ -405,8 +409,8 @@ func (w *Worker) fetchTasks() {
 	defer w.wg.Done()
 
 	emptyCount := 0
-	baseInterval := 1 * time.Second // 基础间隔改为1秒
-	maxInterval := 5 * time.Second  // 最大间隔改5秒，确保任务能在5秒内被拉取
+	baseInterval := 500 * time.Millisecond // 基础间隔改为500ms
+	maxInterval := 2 * time.Second         // 最大间隔改为2秒，确保任务能快速被拉取
 
 	for {
 		select {
@@ -416,10 +420,10 @@ func (w *Worker) fetchTasks() {
 			hasTask := w.pullTask()
 			if hasTask {
 				emptyCount = 0
-				time.Sleep(100 * time.Millisecond) // 有任务时快速拉取
+				time.Sleep(50 * time.Millisecond) // 有任务时快速拉取
 			} else {
 				emptyCount++
-				// 没有任务时逐渐增加等待时间，最多5秒
+				// 没有任务时逐渐增加等待时间，最多2秒
 				interval := baseInterval * time.Duration(emptyCount)
 				if interval > maxInterval {
 					interval = maxInterval

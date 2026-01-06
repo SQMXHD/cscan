@@ -285,6 +285,7 @@ func RegisterHandlers(server *rest.Server, svcCtx *svc.ServiceContext) {
 		{Method: http.MethodGet, Path: "/api/v1/worker/console/terminal/history", Handler: worker.WorkerTerminalHistoryHandler(svcCtx)},
 		// 审计日志
 		{Method: http.MethodGet, Path: "/api/v1/worker/console/audit", Handler: worker.WorkerAuditLogHandler(svcCtx)},
+		{Method: http.MethodDelete, Path: "/api/v1/worker/console/audit", Handler: worker.WorkerAuditLogClearHandler(svcCtx)},
 	}
 
 	// 为控制台路由包装认证中间件和管理员权限中间件

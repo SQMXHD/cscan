@@ -31,9 +31,9 @@ export function deleteCustomPoc(data) {
   return request.post('/poc/custom/delete', data)
 }
 
-// 清空所有自定义POC
-export function clearAllCustomPoc() {
-  return request.post('/poc/custom/clearAll')
+// 清空自定义POC（支持按筛选条件清空）
+export function clearAllCustomPoc(data = {}) {
+  return request.post('/poc/custom/clearAll', data)
 }
 
 // Nuclei默认模板

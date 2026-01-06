@@ -467,11 +467,12 @@
     <!-- 导入指纹对话框（自定义指纹） -->
     <el-dialog v-model="importDialogVisible" title="导入自定义指纹" width="700px">
       <el-alert type="info" :closable="false" style="margin-bottom: 15px">
-        <template #title>支持 ARL finger.json / finger.yml 格式，可批量上传多个文件</template>
+        <template #title>支持多种指纹格式，可批量上传多个文件</template>
         <template #default>
           <div style="font-size: 12px">
-            JSON格式：<code>{"fingerprint": [{"cms": "xxx", "keyword": ["xxx"], "location": "body"}]}</code><br/>
-            YAML格式：<code>- name: Weblogic</code> / <code>rule: body="xxx" && title="xxx"</code>
+            <p style="margin: 5px 0;"><strong>格式1 - ARL finger.json：</strong><code>{"fingerprint": [{"cms": "xxx", "keyword": ["xxx"], "location": "body"}]}</code></p>
+            <p style="margin: 5px 0;"><strong>格式2 - ARL finger.yml：</strong><code>- name: Weblogic</code> / <code>rule: body="xxx" && title="xxx"</code></p>
+            <p style="margin: 5px 0;"><strong>格式3 - 简化YAML：</strong><code>AppName:</code> + <code>- 'body="xxx" || title="xxx"'</code></p>
           </div>
         </template>
       </el-alert>

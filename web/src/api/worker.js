@@ -76,5 +76,10 @@ export function getTerminalHistory(workerName, limit = 100) {
 
 // 审计日志
 export function getAuditLogs(workerName, page = 1, pageSize = 20) {
-  return request.get('/worker/console/audit', { params: { name: workerName, page, pageSize } })
+  return request.get('/worker/console/audit', { params: { workerName, page, pageSize } })
+}
+
+// 清空审计日志
+export function clearAuditLogs(workerName) {
+  return request.delete('/worker/console/audit', { params: { workerName } })
 }

@@ -477,10 +477,10 @@ func (l *FingerprintImportLogic) parseARLFingerYAML(content string) ([]*model.Fi
 	var fingerprints []ARLFingerprint
 	var parseErr error
 
-	// 方式1: 直接解析为数组
+	// 方式1: 直接解析为数组 [{name, rule}]
 	parseErr = yaml.Unmarshal([]byte(content), &fingerprints)
 
-	// 方式2: 如果解析失败或为空，尝试解析为map格式
+	// 方式2: 如果解析失败或为空，尝试解析为map格式 {key: [{name, rule}]}
 	if parseErr != nil || len(fingerprints) == 0 {
 		var wrapper map[string][]ARLFingerprint
 		if err2 := yaml.Unmarshal([]byte(content), &wrapper); err2 == nil {
@@ -502,6 +502,35 @@ func (l *FingerprintImportLogic) parseARLFingerYAML(content string) ([]*model.Fi
 				}
 			}
 		}
+	}
+
+	// 方式4: 尝试解析为 AppName: [rules...] 格式（标准YAML解析）
+	// 格式示例:
+	// NetGain_Enterprise_Manager:
+	// - 'title="NetGain EM" || title="NetGain Enterprise Manager"'
+	if len(fingerprints) == 0 {
+		var appRulesMap map[string][]string
+		if err4 := yaml.Unmarshal([]byte(content), &appRulesMap); err4 == nil && len(appRulesMap) > 0 {
+			for appName, rules := range appRulesMap {
+				appName = strings.TrimSpace(appName)
+				if appName == "" {
+					continue
+				}
+				for _, rule := range rules {
+					rule = strings.TrimSpace(rule)
+					if rule == "" {
+						continue
+					}
+					fingerprints = append(fingerprints, ARLFingerprint{Name: appName, Rule: rule})
+				}
+			}
+		}
+	}
+
+	// 方式5: 手动逐行解析 AppName: [rules...] 格式，支持重复key
+	// 当YAML解析因重复key失败时使用此方式
+	if len(fingerprints) == 0 {
+		fingerprints = parseAppRulesManually(content)
 	}
 
 	if len(fingerprints) == 0 {
@@ -548,6 +577,54 @@ func (l *FingerprintImportLogic) parseARLFingerYAML(content string) ([]*model.Fi
 	}
 
 	return docs, skipped, nil
+}
+
+// parseAppRulesManually 手动逐行解析 AppName: [rules...] 格式
+// 支持重复的应用名称（YAML标准解析会报错）
+func parseAppRulesManually(content string) []ARLFingerprint {
+	var fingerprints []ARLFingerprint
+	lines := strings.Split(content, "\n")
+	
+	var currentAppName string
+	
+	for _, line := range lines {
+		// 跳过空行和注释
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" || strings.HasPrefix(trimmedLine, "#") {
+			continue
+		}
+		
+		// 检查是否是应用名称行（不以 - 开头，以 : 结尾或包含 :）
+		if !strings.HasPrefix(trimmedLine, "-") {
+			// 可能是应用名称
+			if idx := strings.Index(trimmedLine, ":"); idx > 0 {
+				appName := strings.TrimSpace(trimmedLine[:idx])
+				if appName != "" {
+					currentAppName = appName
+				}
+			}
+			continue
+		}
+		
+		// 规则行（以 - 开头）
+		if currentAppName != "" && strings.HasPrefix(trimmedLine, "-") {
+			rule := strings.TrimPrefix(trimmedLine, "-")
+			rule = strings.TrimSpace(rule)
+			// 去除引号包裹
+			if (strings.HasPrefix(rule, "'") && strings.HasSuffix(rule, "'")) ||
+				(strings.HasPrefix(rule, "\"") && strings.HasSuffix(rule, "\"")) {
+				rule = rule[1 : len(rule)-1]
+			}
+			if rule != "" {
+				fingerprints = append(fingerprints, ARLFingerprint{
+					Name: currentAppName,
+					Rule: rule,
+				})
+			}
+		}
+	}
+	
+	return fingerprints
 }
 
 // parseAutoDetect 自动检测格式并解析

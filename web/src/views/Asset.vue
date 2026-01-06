@@ -1029,10 +1029,11 @@ async function doCreateScanTask() {
   
   try {
     scanSubmitting.value = true
+    const wsId = workspaceStore.currentWorkspaceId === 'all' ? '' : (workspaceStore.currentWorkspaceId || '')
     const res = await createTask({
       name: `${taskName} (${selectedRows.value.length}个资产)`,
       target: targets,
-      workspaceId: workspaceStore.currentWorkspaceId || '',
+      workspaceId: wsId,
       config: JSON.stringify(config)
     })
     
@@ -1040,7 +1041,7 @@ async function doCreateScanTask() {
       // 创建成功后自动启动任务
       const taskId = res.id || res.taskId
       if (taskId) {
-        const startRes = await startTask({ id: taskId })
+        const startRes = await startTask({ id: taskId, workspaceId: wsId || res.workspaceId })
         if (startRes.code === 0) {
           ElMessage.success('扫描任务已创建并启动')
         } else {

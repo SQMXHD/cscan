@@ -905,7 +905,7 @@ async function handleSubmit() {
     if (res.code === 0) {
       ElMessage.success(isEdit.value ? '任务更新成功' : '任务创建成功')
       if (!isEdit.value && res.id) {
-        await startTask({ id: res.id })
+        await startTask({ id: res.id, workspaceId: form.workspaceId })
         ElMessage.success('任务已启动')
       }
       router.push('/task')

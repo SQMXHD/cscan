@@ -59,11 +59,11 @@
         </el-table-column>
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="row.status === 'CREATED'" type="success" link size="small" @click="handleStart(row)">启动</el-button>
-            <el-button v-if="row.status === 'CREATED'" type="warning" link size="small" @click="goToEditTask(row)">编辑</el-button>
-            <el-button v-if="row.status === 'STARTED'" type="warning" link size="small" @click="handlePause(row)">暂停</el-button>
+            <el-button v-if="row.status === 'CREATED' || !row.status" type="success" link size="small" @click="handleStart(row)">启动</el-button>
+            <el-button v-if="row.status === 'CREATED' || !row.status" type="warning" link size="small" @click="goToEditTask(row)">编辑</el-button>
+            <el-button v-if="['STARTED', 'PENDING'].includes(row.status)" type="warning" link size="small" @click="handlePause(row)">暂停</el-button>
             <el-button v-if="row.status === 'PAUSED'" type="success" link size="small" @click="handleResume(row)">继续</el-button>
-            <el-button v-if="['STARTED', 'PAUSED', 'PENDING'].includes(row.status)" type="danger" link size="small" @click="handleStop(row)">停止</el-button>
+            <el-button v-if="['STARTED', 'PAUSED', 'PENDING', 'CREATED', ''].includes(row.status) && row.status !== 'SUCCESS' && row.status !== 'FAILURE' && row.status !== 'STOPPED'" type="danger" link size="small" @click="handleStop(row)">停止</el-button>
             <el-button type="primary" link size="small" @click="showDetail(row)">详情</el-button>
             <el-button type="info" link size="small" @click="showLogs(row)">日志</el-button>
             <el-button type="info" link size="small" @click="viewReport(row)">报告</el-button>
@@ -984,24 +984,31 @@ async function handleRetry(row) {
 }
 
 async function handleStart(row) {
-  const res = await startTask({ id: row.id })
-  res.code === 0 ? (ElMessage.success('任务已启动'), loadData()) : ElMessage.error(res.msg)
+  const res = await startTask({ id: row.id, workspaceId: row.workspaceId })
+  if (res.code === 0) {
+    ElMessage.success('任务已启动')
+    loadData()
+    // 延迟再刷新一次，等待 Worker 拉取任务后状态更新
+    setTimeout(() => loadData(), 2000)
+  } else {
+    ElMessage.error(res.msg)
+  }
 }
 
 async function handlePause(row) {
   await ElMessageBox.confirm('确定暂停该任务吗？', '提示', { type: 'warning' })
-  const res = await pauseTask({ id: row.id })
+  const res = await pauseTask({ id: row.id, workspaceId: row.workspaceId })
   res.code === 0 ? (ElMessage.success('任务已暂停'), loadData()) : ElMessage.error(res.msg)
 }
 
 async function handleResume(row) {
-  const res = await resumeTask({ id: row.id })
+  const res = await resumeTask({ id: row.id, workspaceId: row.workspaceId })
   res.code === 0 ? (ElMessage.success('任务已继续'), loadData()) : ElMessage.error(res.msg)
 }
 
 async function handleStop(row) {
   await ElMessageBox.confirm('确定停止该任务吗？', '提示', { type: 'warning' })
-  const res = await stopTask({ id: row.id })
+  const res = await stopTask({ id: row.id, workspaceId: row.workspaceId })
   res.code === 0 ? (ElMessage.success('任务已停止'), loadData()) : ElMessage.error(res.msg)
 }
 

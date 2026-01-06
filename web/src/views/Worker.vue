@@ -662,7 +662,7 @@ async function submitConcurrency() {
       ElMessage.success('并发数设置命令已发送')
       concurrencyDialogVisible.value = false
       // 延迟刷新，等待Worker更新状态
-      setTimeout(() => loadData(), 1000)
+      setTimeout(() => loadData(), 500)
     } else {
       ElMessage.error(res.msg || '设置失败')
     }

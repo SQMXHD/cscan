@@ -204,15 +204,35 @@ func (l *CustomPocSaveLogic) CustomPocSave(req *types.CustomPocSaveReq) (resp *t
 		}
 	}
 
+	// 检查是否与默认模板重复（仅新建时检查，通过templateId匹配）
+	isDuplicate := false
+	if req.Id == "" && req.TemplateId != "" {
+		existingTemplate, err := l.svcCtx.NucleiTemplateModel.FindByTemplateId(l.ctx, req.TemplateId)
+		if err == nil && existingTemplate != nil {
+			// 存在重复的默认模板
+			isDuplicate = true
+		}
+	}
+
+	// 如果重复，修改名称并禁用
+	pocName := req.Name
+	pocEnabled := req.Enabled
+	if isDuplicate {
+		if !strings.HasPrefix(pocName, "【重复】") {
+			pocName = "【重复】" + pocName
+		}
+		pocEnabled = false
+	}
+
 	doc := &model.CustomPoc{
-		Name:        req.Name,
+		Name:        pocName,
 		TemplateId:  req.TemplateId,
 		Severity:    req.Severity,
 		Tags:        req.Tags,
 		Author:      req.Author,
 		Description: req.Description,
 		Content:     req.Content,
-		Enabled:     req.Enabled,
+		Enabled:     pocEnabled,
 	}
 
 	if req.Id != "" {
@@ -227,7 +247,12 @@ func (l *CustomPocSaveLogic) CustomPocSave(req *types.CustomPocSaveReq) (resp *t
 		}
 	}
 
-	return &types.BaseResp{Code: 0, Msg: "保存成功"}, nil
+	msg := "保存成功"
+	if isDuplicate {
+		msg = "保存成功，该POC与默认模板重复，已标记【重复】并禁用"
+	}
+
+	return &types.BaseResp{Code: 0, Msg: msg}, nil
 }
 
 type CustomPocDeleteLogic struct {
@@ -275,6 +300,7 @@ func (l *CustomPocBatchImportLogic) CustomPocBatchImport(req *types.CustomPocBat
 
 	imported := 0
 	failed := 0
+	duplicateCount := 0
 	errors := make([]string, 0)
 
 	for i, poc := range req.Pocs {
@@ -290,15 +316,36 @@ func (l *CustomPocBatchImportLogic) CustomPocBatchImport(req *types.CustomPocBat
 			continue
 		}
 
+		// 检查是否与默认模板重复（通过templateId匹配）
+		isDuplicate := false
+		if poc.TemplateId != "" {
+			existingTemplate, err := l.svcCtx.NucleiTemplateModel.FindByTemplateId(l.ctx, poc.TemplateId)
+			if err == nil && existingTemplate != nil {
+				// 存在重复的默认模板
+				isDuplicate = true
+				duplicateCount++
+			}
+		}
+
+		// 如果重复，修改名称并禁用
+		pocName := poc.Name
+		pocEnabled := poc.Enabled
+		if isDuplicate {
+			if !strings.HasPrefix(pocName, "【重复】") {
+				pocName = "【重复】" + pocName
+			}
+			pocEnabled = false
+		}
+
 		doc := &model.CustomPoc{
-			Name:        poc.Name,
+			Name:        pocName,
 			TemplateId:  poc.TemplateId,
 			Severity:    poc.Severity,
 			Tags:        poc.Tags,
 			Author:      poc.Author,
 			Description: poc.Description,
 			Content:     poc.Content,
-			Enabled:     poc.Enabled,
+			Enabled:     pocEnabled,
 		}
 
 		err := l.svcCtx.CustomPocModel.Insert(l.ctx, doc)
@@ -313,6 +360,9 @@ func (l *CustomPocBatchImportLogic) CustomPocBatchImport(req *types.CustomPocBat
 	msg := "导入完成"
 	if failed > 0 {
 		msg = "部分导入成功"
+	}
+	if duplicateCount > 0 {
+		msg = fmt.Sprintf("%s，%d个POC与默认模板重复已标记并禁用", msg, duplicateCount)
 	}
 
 	return &types.CustomPocBatchImportResp{
@@ -771,12 +821,34 @@ func NewCustomPocClearAllLogic(ctx context.Context, svcCtx *svc.ServiceContext) 
 	}
 }
 
-func (l *CustomPocClearAllLogic) CustomPocClearAll() (resp *types.CustomPocClearAllResp, err error) {
-	// 先获取总数
-	total, _ := l.svcCtx.CustomPocModel.Count(l.ctx)
+func (l *CustomPocClearAllLogic) CustomPocClearAll(req *types.CustomPocClearAllReq) (resp *types.CustomPocClearAllResp, err error) {
+	// 构建筛选条件
+	filter := bson.M{}
+	if req.Name != "" {
+		filter["name"] = bson.M{"$regex": req.Name, "$options": "i"}
+	}
+	if req.TemplateId != "" {
+		filter["template_id"] = bson.M{"$regex": req.TemplateId, "$options": "i"}
+	}
+	if req.Severity != "" {
+		filter["severity"] = req.Severity
+	}
+	if req.Tag != "" {
+		filter["tags"] = bson.M{"$in": []string{req.Tag}}
+	}
+	if req.Enabled != nil {
+		filter["enabled"] = *req.Enabled
+	}
+
+	// 先获取符合条件的总数
+	total, _ := l.svcCtx.CustomPocModel.CountWithFilter(l.ctx, filter)
 	
-	// 删除所有自定义POC
-	deleted, err := l.svcCtx.CustomPocModel.DeleteAll(l.ctx)
+	if total == 0 {
+		return &types.CustomPocClearAllResp{Code: 0, Msg: "没有符合条件的POC", Deleted: 0}, nil
+	}
+	
+	// 按条件删除自定义POC
+	deleted, err := l.svcCtx.CustomPocModel.DeleteWithFilter(l.ctx, filter)
 	if err != nil {
 		return &types.CustomPocClearAllResp{Code: 500, Msg: "清空失败: " + err.Error()}, nil
 	}

@@ -52,16 +52,8 @@ func (l *WorkerInstallLogic) GetInstallCommand(req *types.WorkerInstallCommandRe
 		l.Logger.Infof("[WorkerInstall] Generated new install key: %s", installKey)
 	}
 
-	// 构建API服务地址（优先使用请求参数，其次使用配置，最后使用默认值）
+	// 构建API服务地址（优先使用请求参数，其次使用默认值）
 	serverAddr := req.ServerAddr
-	if serverAddr == "" {
-		serverAddr = l.svcCtx.Config.WorkerInstall.ServerAddr
-	}
-	if serverAddr == "" {
-		// 使用配置的端口，但需要用户手动填写实际IP
-		serverAddr = fmt.Sprintf("<服务器IP>:%d", l.svcCtx.Config.Port)
-	}
-
 	// 移除 serverAddr 中的协议前缀，统一处理
 	serverAddrClean := serverAddr
 	if len(serverAddrClean) > 8 && serverAddrClean[:8] == "https://" {

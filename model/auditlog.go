@@ -219,6 +219,17 @@ func (m *AuditLogModel) DeleteOldRecords(ctx context.Context, days int) (int64, 
 	return m.DeleteMany(ctx, filter)
 }
 
+// ClearByWorker 清空指定Worker的审计日志
+func (m *AuditLogModel) ClearByWorker(ctx context.Context, workerName string) (int64, error) {
+	filter := bson.M{"worker_name": workerName}
+	return m.DeleteMany(ctx, filter)
+}
+
+// ClearAll 清空所有审计日志
+func (m *AuditLogModel) ClearAll(ctx context.Context) (int64, error) {
+	return m.DeleteMany(ctx, bson.M{})
+}
+
 // AuditLogFilter 审计日志过滤条件
 type AuditLogFilter struct {
 	Type       AuditLogType

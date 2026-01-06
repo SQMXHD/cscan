@@ -147,6 +147,18 @@
 
       <!-- 审计日志 -->
       <el-tab-pane label="审计日志" name="audit">
+        <div style="margin-bottom: 15px; display: flex; justify-content: flex-end;">
+          <el-popconfirm
+            title="确定要清空所有审计日志吗？此操作不可恢复！"
+            confirm-button-text="确定"
+            cancel-button-text="取消"
+            @confirm="clearAuditLogsHandler"
+          >
+            <template #reference>
+              <el-button type="danger" size="small" :loading="auditClearing">清空日志</el-button>
+            </template>
+          </el-popconfirm>
+        </div>
         <el-table :data="auditLogs" v-loading="auditLoading" stripe>
           <el-table-column prop="createTime" label="时间" width="180">
             <template #default="{ row }">
@@ -212,7 +224,7 @@ import {
 } from '@element-plus/icons-vue'
 import { 
   getWorkerInfo, listFiles, uploadFile, downloadFile, deleteFile, createDir,
-  openTerminal, closeTerminal, execCommand, getAuditLogs 
+  openTerminal, closeTerminal, execCommand, getAuditLogs, clearAuditLogs 
 } from '@/api/worker'
 import { useUserStore } from '@/stores/user'
 
@@ -248,6 +260,7 @@ let terminalWs = null
 const auditLogs = ref([])
 const auditLoading = ref(false)
 const auditPage = ref(1)
+const auditClearing = ref(false)
 const auditTotal = ref(0)
 
 const pathParts = computed(() => {
@@ -537,6 +550,26 @@ async function loadAuditLogs() {
     ElMessage.error('获取审计日志失败: ' + e.message)
   } finally {
     auditLoading.value = false
+  }
+}
+
+// 清空审计日志
+async function clearAuditLogsHandler() {
+  auditClearing.value = true
+  try {
+    const res = await clearAuditLogs(workerName.value)
+    if (res.code === 0) {
+      ElMessage.success(res.msg || res.data?.msg || '审计日志已清空')
+      auditLogs.value = []
+      auditTotal.value = 0
+      auditPage.value = 1
+    } else {
+      ElMessage.error(res.message || '清空审计日志失败')
+    }
+  } catch (e) {
+    ElMessage.error('清空审计日志失败: ' + e.message)
+  } finally {
+    auditClearing.value = false
   }
 }
 

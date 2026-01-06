@@ -292,6 +292,15 @@ func (m *CustomPocModel) DeleteAll(ctx context.Context) (int64, error) {
 	return result.DeletedCount, nil
 }
 
+// DeleteWithFilter 按条件删除自定义POC
+func (m *CustomPocModel) DeleteWithFilter(ctx context.Context, filter bson.M) (int64, error) {
+	result, err := m.coll.DeleteMany(ctx, filter)
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
+}
+
 // FindByIds 根据ID列表获取自定义POC
 func (m *CustomPocModel) FindByIds(ctx context.Context, ids []string) ([]CustomPoc, error) {
 	if len(ids) == 0 {

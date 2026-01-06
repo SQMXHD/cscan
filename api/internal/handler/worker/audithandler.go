@@ -8,6 +8,8 @@ import (
 	"cscan/api/internal/svc"
 	"cscan/model"
 	"cscan/pkg/response"
+
+	"github.com/zeromicro/go-zero/core/logx"
 )
 
 // WorkerAuditLogHandler 获取审计日志
@@ -80,6 +82,38 @@ func WorkerAuditLogHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			"total":    total,
 			"page":     page,
 			"pageSize": pageSize,
+		})
+	}
+}
+
+// WorkerAuditLogClearHandler 清空审计日志
+// DELETE /api/v1/worker/console/audit
+func WorkerAuditLogClearHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		workerName := r.URL.Query().Get("workerName")
+		ctx := r.Context()
+
+		var deleted int64
+		var err error
+
+		if workerName != "" {
+			// 清空指定 Worker 的审计日志
+			deleted, err = svcCtx.AuditLogModel.ClearByWorker(ctx, workerName)
+		} else {
+			// 清空所有审计日志
+			deleted, err = svcCtx.AuditLogModel.ClearAll(ctx)
+		}
+
+		if err != nil {
+			response.ErrorWithCode(w, http.StatusInternalServerError, "failed to clear audit logs: "+err.Error())
+			return
+		}
+
+		logx.Infof("Audit logs cleared: workerName=%s, deleted=%d", workerName, deleted)
+
+		response.Success(w, map[string]interface{}{
+			"deleted": deleted,
+			"msg":     fmt.Sprintf("已清空 %d 条审计日志", deleted),
 		})
 	}
 }

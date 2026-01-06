@@ -68,11 +68,17 @@ func (m *AuthMiddleware) Handle(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// 将用户信息存入Context
+		// 将用户信息存入Context（确保类型为string）
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, UserIdKey, claims["userId"])
-		ctx = context.WithValue(ctx, UsernameKey, claims["username"])
-		ctx = context.WithValue(ctx, RoleKey, claims["role"])
+		if userId, ok := claims["userId"].(string); ok {
+			ctx = context.WithValue(ctx, UserIdKey, userId)
+		}
+		if username, ok := claims["username"].(string); ok {
+			ctx = context.WithValue(ctx, UsernameKey, username)
+		}
+		if role, ok := claims["role"].(string); ok {
+			ctx = context.WithValue(ctx, RoleKey, role)
+		}
 
 		// 从Header获取当前工作空间
 		workspaceId := r.Header.Get("X-Workspace-Id")

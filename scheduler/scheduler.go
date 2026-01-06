@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,7 +86,14 @@ func (s *Scheduler) RemoveCronTask(id cron.EntryID) {
 	s.cron.Remove(id)
 }
 
+// GetWorkerQueueKey 获取 Worker 专属队列的 Key
+func (s *Scheduler) GetWorkerQueueKey(workerName string) string {
+	return fmt.Sprintf("cscan:task:queue:worker:%s", strings.ToLower(workerName))
+}
+
 // PushTask 推送任务到队列
+// 如果任务指定了 Workers，则推送到每个 Worker 的专属队列
+// 否则推送到公共队列
 func (s *Scheduler) PushTask(ctx context.Context, task *TaskInfo) error {
 	if task.TaskId == "" {
 		task.TaskId = uuid.New().String()
@@ -99,10 +107,74 @@ func (s *Scheduler) PushTask(ctx context.Context, task *TaskInfo) error {
 
 	// 使用优先级队列，分数越小优先级越高
 	score := float64(time.Now().Unix()) - float64(task.Priority*1000)
+
+	// 如果指定了 Workers，推送到每个 Worker 的专属队列
+	if len(task.Workers) > 0 {
+		pipe := s.rdb.Pipeline()
+		for _, workerName := range task.Workers {
+			workerQueueKey := s.GetWorkerQueueKey(workerName)
+			pipe.ZAdd(ctx, workerQueueKey, redis.Z{
+				Score:  score,
+				Member: data,
+			})
+		}
+		_, err = pipe.Exec(ctx)
+		return err
+	}
+
+	// 没有指定 Worker，推送到公共队列
 	return s.rdb.ZAdd(ctx, s.queueKey, redis.Z{
 		Score:  score,
 		Member: data,
 	}).Err()
+}
+
+// PushTaskBatch 批量推送任务到队列（使用 Pipeline 提高性能）
+// 如果任务指定了 Workers，则推送到每个 Worker 的专属队列
+// 否则推送到公共队列
+func (s *Scheduler) PushTaskBatch(ctx context.Context, tasks []*TaskInfo) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	pipe := s.rdb.Pipeline()
+	baseTime := time.Now()
+
+	for i, task := range tasks {
+		if task.TaskId == "" {
+			task.TaskId = uuid.New().String()
+		}
+		task.CreateTime = baseTime.Local().Format("2006-01-02 15:04:05")
+
+		data, err := json.Marshal(task)
+		if err != nil {
+			continue
+		}
+
+		// 使用优先级队列，分数越小优先级越高
+		// 同一批次的任务按顺序递增分数，保持顺序
+		score := float64(baseTime.Unix()) - float64(task.Priority*1000) + float64(i)*0.001
+
+		// 如果指定了 Workers，推送到每个 Worker 的专属队列
+		if len(task.Workers) > 0 {
+			for _, workerName := range task.Workers {
+				workerQueueKey := s.GetWorkerQueueKey(workerName)
+				pipe.ZAdd(ctx, workerQueueKey, redis.Z{
+					Score:  score,
+					Member: data,
+				})
+			}
+		} else {
+			// 没有指定 Worker，推送到公共队列
+			pipe.ZAdd(ctx, s.queueKey, redis.Z{
+				Score:  score,
+				Member: data,
+			})
+		}
+	}
+
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 // PopTask 从队列获取任务
