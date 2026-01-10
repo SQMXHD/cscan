@@ -20,7 +20,7 @@
 - **分布式架构** - Worker 节点水平扩展，支持多节点并行扫描
 - **多工作空间** - 项目隔离，团队协作
 
-## 快速开始
+## 快速开始(支持amd64+arm64)
 
 ```bash
 git clone https://github.com/tangxiaofeng7/cscan.git
