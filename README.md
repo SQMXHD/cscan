@@ -28,7 +28,7 @@ cd cscan
 docker-compose up -d
 ```
 
-访问 `http://ip:3000`，默认账号 `admin / 123456`
+访问 `http://ip::3443`，默认账号 `admin / 123456`
 
 > **注意！！！执行扫描之前需要手动先部署worker**
 
